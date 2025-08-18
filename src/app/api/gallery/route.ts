@@ -1,15 +1,16 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma'; // ✅ ESTA ES LA BUENA
+// src/app/api/gallery/route.ts
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    const images = await prisma.galleryImage.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-
-    return NextResponse.json(images);
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: 'Error al obtener imágenes' }, { status: 500 });
+    const items = await prisma.galleryImage.findMany({ orderBy: { id: 'desc' } })
+    return NextResponse.json(items)
+  } catch (e: any) {
+    console.error('GET /api/gallery error:', e)
+    return NextResponse.json({ error: 'Error al obtener galería' }, { status: 500 })
   }
 }

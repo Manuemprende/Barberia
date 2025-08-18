@@ -1,9 +1,15 @@
 ﻿'use client'
 
+'use client'
+
 import { useEffect, useState } from 'react'
 import { GiScissors } from 'react-icons/gi'
+
+// Swiper v11 – imports correctos
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Autoplay, Pagination } from 'swiper/modules'
+
+// Estilos Swiper
 import 'swiper/css'
 import 'swiper/css/pagination'
 
