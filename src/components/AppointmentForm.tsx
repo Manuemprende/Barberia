@@ -49,7 +49,7 @@ export default function AppointmentForm() {
         setStart('')
         setNotes('')
       }
-    } catch (err) {
+    } catch (unknown) {
       setError('Error de conexión con el servidor')
     } finally {
       setLoading(false)

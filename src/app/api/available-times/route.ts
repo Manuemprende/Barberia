@@ -1,67 +1,47 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'; // ✅ ESTA ES LA BUENA
-import { startOfDay, endOfDay, addMinutes, isBefore, format } from 'date-fns'
+import { prisma } from '@/lib/prisma'
+import { addMinutes, startOfDay, endOfDay, format } from 'date-fns'
+
+type Payload = { barberId: number; serviceId: number; date: string }
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { barberId, serviceId, date } = body
-
+    const { barberId, serviceId, date } = (await req.json()) as Payload
     if (!barberId || !serviceId || !date) {
-      return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
+      return NextResponse.json([], { status: 200 })
     }
 
     const service = await prisma.service.findUnique({ where: { id: serviceId } })
-    if (!service) {
-      return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 })
-    }
-
-    const duration = service.duration
+    if (!service) return NextResponse.json([], { status: 200 })
 
     const dayStart = startOfDay(new Date(date))
     const dayEnd = endOfDay(new Date(date))
 
-    // Obtener citas existentes del barbero para ese día
-    const appointments = await prisma.appointment.findMany({
+    // ejemplo slots 9:00-19:00 cada 30 min
+    const slots: string[] = []
+    let cursor = new Date(dayStart)
+    cursor.setHours(9, 0, 0, 0)
+
+    while (cursor <= dayEnd && cursor.getHours() < 19) {
+      slots.push(format(cursor, 'HH:mm'))
+      cursor = addMinutes(cursor, 30)
+    }
+
+    const appts = await prisma.appointment.findMany({
       where: {
         barberId,
-        start: { gte: dayStart, lt: dayEnd },
-        status: 'SCHEDULED'
-      },
-      select: {
-        start: true,
-        end: true
+        start: { gte: dayStart, lte: dayEnd }
       }
     })
 
-    // Crear bloques de 15 minutos entre 09:00 y 20:00
-    const openingHour = 9
-    const closingHour = 20
-    const slots: string[] = []
+    const busy = new Set(
+      appts.map(a => format(new Date(a.start), 'HH:mm'))
+    )
 
-    const slotStart = new Date(`${date}T${openingHour.toString().padStart(2, '0')}:00:00`)
-    const slotEnd = new Date(`${date}T${closingHour.toString().padStart(2, '0')}:00:00`)
-
-    let current = new Date(slotStart)
-
-    while (addMinutes(current, duration) <= slotEnd) {
-      const startTime = new Date(current)
-      const endTime = addMinutes(startTime, duration)
-
-      const overlaps = appointments.some(appt => {
-        return startTime < appt.end && endTime > appt.start
-      })
-
-      if (!overlaps) {
-        slots.push(format(startTime, 'HH:mm'))
-      }
-
-      current = addMinutes(current, 15)
-    }
-
-    return NextResponse.json(slots)
-  } catch (error) {
-    console.error(error)
-    return NextResponse.json({ error: 'Error consultando disponibilidad' }, { status: 500 })
+    const available = slots.filter(t => !busy.has(t))
+    return NextResponse.json(available)
+  } catch (err) {
+    console.error('POST /available-times error', err)
+    return NextResponse.json([], { status: 200 })
   }
 }

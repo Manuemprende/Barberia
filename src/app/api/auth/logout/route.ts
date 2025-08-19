@@ -1,10 +1,9 @@
+// src/app/api/auth/logout/route.ts
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-
-const COOKIE_NAME = 'cm_admin_token'
+import { clearSessionCookie } from '@/lib/auth'
 
 export async function POST() {
-  const ck = await cookies()
-  ck.set(COOKIE_NAME, '', { path: '/', maxAge: 0 })
-  return NextResponse.json({ ok: true })
+  const res = NextResponse.json({ ok: true })
+  res.headers.set('Set-Cookie', clearSessionCookie())
+  return res
 }
