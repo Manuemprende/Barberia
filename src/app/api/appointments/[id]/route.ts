@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import type { Prisma } from '@prisma/client'
+
+// Tipos de estado válidos (de tu schema.prisma)
+type Status = 'SCHEDULED' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED'
 
 // PATCH /api/appointments/:id  -> actualizar estado
 export async function PATCH(
@@ -9,11 +11,11 @@ export async function PATCH(
 ) {
   try {
     const apptId = Number(params.id)
-    if (Number.isNaN(apptId)) {
+    if (!Number.isFinite(apptId)) {
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
 
-    const body = (await req.json()) as { status?: Prisma.AppointmentUpdateInput['status'] }
+    const body = (await req.json()) as { status?: Status }
     if (!body?.status) {
       return NextResponse.json({ error: 'Falta status' }, { status: 400 })
     }
@@ -38,7 +40,7 @@ export async function DELETE(
 ) {
   try {
     const apptId = Number(params.id)
-    if (Number.isNaN(apptId)) {
+    if (!Number.isFinite(apptId)) {
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
 
