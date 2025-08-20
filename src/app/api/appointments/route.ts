@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma'
 
 const normalizePhone = (s: string) => s.replace(/\D+/g, '')
 
-// ---------- POST: crear cita (tu código, sin cambios)
 export async function POST(req: Request) {
   try {
     const body = await req.json() as {
@@ -80,6 +79,7 @@ export async function POST(req: Request) {
         appointmentDate: apptDate,
         status: 'SCHEDULED',
         notes: body.notes ?? null,
+        priceSnapshot: service.price, // 👈 nuevo: congela el precio
       },
       include: { barber: true, service: true },
     })
@@ -88,62 +88,5 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error('POST /api/appointments error', err)
     return NextResponse.json({ error: 'Error al crear la cita' }, { status: 500 })
-  }
-}
-
-// ---------- GET: listar citas (para dashboard/consulta)
-export async function GET(req: Request) {
-  try {
-    const url = new URL(req.url)
-    const sp = url.searchParams
-
-    // filtros opcionales
-    const from = sp.get('from')         // ISO
-    const to = sp.get('to')             // ISO
-    const status = sp.get('status')     // SCHEDULED|CONFIRMED|CANCELLED|COMPLETED
-    const upcoming = sp.get('upcoming') // '1' -> solo futuras
-    const today = sp.get('today')       // '1' -> solo hoy (según tz del server)
-    const limit = Math.min(parseInt(sp.get('limit') || '10', 10), 100)
-
-    const where: any = {}
-
-    if (status) where.status = status
-
-    if (today === '1') {
-      const now = new Date()
-      const startDay = new Date(now); startDay.setHours(0,0,0,0)
-      const endDay = new Date(now);   endDay.setHours(23,59,59,999)
-      where.start = { gte: startDay, lte: endDay }
-    } else {
-      if (from) {
-        const d = new Date(from)
-        if (!Number.isNaN(d.getTime())) {
-          where.start = { ...(where.start || {}), gte: d }
-        }
-      }
-      if (to) {
-        const d = new Date(to)
-        if (!Number.isNaN(d.getTime())) {
-          where.start = { ...(where.start || {}), lte: d }
-        }
-      }
-    }
-
-    if (upcoming === '1') {
-      const now = new Date()
-      where.start = { ...(where.start || {}), gte: now }
-    }
-
-    const items = await prisma.appointment.findMany({
-      where,
-      orderBy: { start: 'asc' },
-      take: limit,
-      include: { barber: true, service: true },
-    })
-
-    return NextResponse.json(items)
-  } catch (err) {
-    console.error('GET /api/appointments error', err)
-    return NextResponse.json({ error: 'Error al listar' }, { status: 500 })
   }
 }

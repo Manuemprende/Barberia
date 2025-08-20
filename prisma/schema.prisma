@@ -14,22 +14,28 @@ generator client {
 // Enum para el estado de las citas.
 enum AppointmentStatus {
   SCHEDULED
+  CONFIRMED
   CANCELLED
   COMPLETED
 }
 
+// 👇 Enum para estado de pago (nuevo)
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
 // Modelo del barbero.
-// Añade otros campos según tus necesidades (e.g. foto, experiencia).
 model Barber {
-  id           Int          @id @default(autoincrement())
+  id           Int           @id @default(autoincrement())
   name         String
   appointments Appointment[]
 }
 
 // Modelo del servicio.
-// Puedes añadir un campo `description` o similar si lo necesitas.
 model Service {
-  id           Int          @id @default(autoincrement())
+  id           Int           @id @default(autoincrement())
   name         String
   price        Int
   duration     Int
@@ -37,41 +43,49 @@ model Service {
 }
 
 model GalleryImage {
-  id        Int       @id @default(autoincrement())
-  url       String    // URL de la imagen
-  title     String?   // Título opcional o descripción
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  url       String // URL de la imagen
+  title     String? // Título opcional o descripción
+  createdAt DateTime @default(now())
 
   @@map("gallery_images") // opcional: nombre de tabla personalizado
 }
 
 model Comment {
-  id         Int      @id @default(autoincrement())
-  name       String
-  message    String
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  name      String
+  message   String
+  createdAt DateTime @default(now())
+  // 👇 moderación (nuevo)
+  visible   Boolean  @default(true)
 
   @@map("comments") // opcional: nombre de tabla personalizado
 }
 
 // Modelo de la cita.
 model Appointment {
-  id                 Int                @id @default(autoincrement())
+  id                 Int               @id @default(autoincrement())
   customerName       String
   whatsapp           String
   /// Solo dígitos para comparaciones (útil para buscar por número normalizado)
-  whatsappNormalized String             @default("")
-  barber             Barber             @relation(fields: [barberId], references: [id])
+  whatsappNormalized String            @default("")
+  barber             Barber            @relation(fields: [barberId], references: [id])
   barberId           Int
-  service            Service            @relation(fields: [serviceId], references: [id])
+  service            Service           @relation(fields: [serviceId], references: [id])
   serviceId          Int
   start              DateTime
   end                DateTime
   /// Fecha de la cita (sin hora) para limitar a una cita por día
-  appointmentDate DateTime @db.Date @default(now())
-  status             AppointmentStatus  @default(SCHEDULED)
+  appointmentDate    DateTime          @default(now()) @db.Date
+  status             AppointmentStatus @default(SCHEDULED)
   notes              String?
-  createdAt          DateTime           @default(now())
+  createdAt          DateTime          @default(now())
+
+  // 👇 pagos (nuevo)
+  paymentStatus PaymentStatus @default(UNPAID)
+  paidAt        DateTime?
+  /// Precio congelado al agendar (CLP); usa service.price al crear
+  priceSnapshot Int           @default(0)
 
   // Índices para acelerar consultas por barbero y servicio
   @@index([barberId, start, end])
