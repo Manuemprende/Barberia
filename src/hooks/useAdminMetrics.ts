@@ -16,7 +16,7 @@ export function useAdminMetrics() {
   useEffect(() => {
     async function fetchMetrics() {
       try {
-        const res = await fetch("/admin/metrics");
+        const res = await fetch("/api/admin/metrics");
         const json = await res.json();
         setData(json);
       } catch (err) {
