@@ -14,7 +14,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // Proteger /admin/** excepto /admin/login
-  if (pathname.startsWith('/admin')) {
+  if (pathname.startsWith('/admin/**')) {
     const token = req.cookies.get(COOKIE)?.value;
     if (!token) {
       return NextResponse.redirect(new URL('/admin/login', req.url));
