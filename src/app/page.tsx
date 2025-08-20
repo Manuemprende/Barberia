@@ -15,7 +15,11 @@ export default function Home() {
   return (
     <>
       <Navbar />
-      <Hero />
+     <Hero
+        poster="/hero/poster.jpg"
+        webmSrc="/hero/barber.webm"
+        mp4Src="/hero/barber.mp4"
+      />
       <Services />
       <BookingForm />   {/* Aquí se renderiza el formulario de reserva al cargar la página */}
       <CancelBooking />
