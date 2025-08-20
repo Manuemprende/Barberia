@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// Tipos de estado válidos (de tu schema.prisma)
+// Tipos de estado válidos
 type Status = 'SCHEDULED' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED'
 
-// PATCH /api/appointments/:id  -> actualizar estado
+// PATCH /api/appointments/:id
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
@@ -33,7 +33,7 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/appointments/:id  -> eliminar cita
+// DELETE /api/appointments/:id
 export async function DELETE(
   _req: Request,
   { params }: { params: { id: string } }
