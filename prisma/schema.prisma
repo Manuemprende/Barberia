@@ -46,10 +46,10 @@ model GalleryImage {
 }
 
 model Comment {
-  id         Int       @id @default(autoincrement())
-  nombre     String
-  comentario String
-  createdAt  DateTime  @default(now())
+  id         Int      @id @default(autoincrement())
+  name       String
+  message    String
+  createdAt  DateTime @default(now())
 
   @@map("comments") // opcional: nombre de tabla personalizado
 }
