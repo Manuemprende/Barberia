@@ -1,76 +1,29 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model Barber {
-  id           Int           @id @default(autoincrement())
-  name         String
-  specialties  String
-  available    Boolean       @default(true)
-  appointments Appointment[]
-}
-
-model Service {
-  id           Int           @id @default(autoincrement())
-  name         String
-  price        Int
-  duration     Int
-  appointments Appointment[]
-}
-
 model Appointment {
-  id           Int               @id @default(autoincrement())
-  customerName String
-  whatsapp     String
-  barberId     Int
-  serviceId    Int
-  start        DateTime
-  end          DateTime
-  status       AppointmentStatus @default(SCHEDULED)
-  notes        String?
-  createdAt    DateTime          @default(now())
-  barber       Barber            @relation(fields: [barberId], references: [id])
-  service      Service           @relation(fields: [serviceId], references: [id])
+  id            Int                @id @default(autoincrement())
+  customerName  String
+  whatsapp      String
+
+  /// 👇 NUEVO: solo dígitos para comparaciones
+  whatsappNormalized String        @default("")
+
+  barber        Barber             @relation(fields: [barberId], references: [id])
+  barberId      Int
+  service       Service            @relation(fields: [serviceId], references: [id])
+  serviceId     Int
+
+  start         DateTime
+  end           DateTime
+
+  /// 👇 NUEVO: fecha de la cita (sin hora) para validar “una por día”
+  appointmentDate DateTime         @db.Date
+
+  status        AppointmentStatus  @default(SCHEDULED)
+  notes         String?
+  createdAt     DateTime           @default(now())
 
   @@index([barberId, start, end])
   @@index([serviceId])
-}
 
-model GalleryImage {
-  id        Int      @id @default(autoincrement())
-  title     String
-  imageUrl  String
-  createdAt DateTime @default(now())
-}
-
-model Comment {
-  id        Int      @id @default(autoincrement())
-  name      String
-  message   String
-  createdAt DateTime @default(now())
-}
-
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  password  String
-  role      Role     @default(ADMIN)
-  createdAt DateTime @default(now())
-}
-
-enum AppointmentStatus {
-  SCHEDULED
-  CANCELLED
-  COMPLETED
-  CONFIRMED
-}
-
-enum Role {
-  ADMIN
+  /// 👇 NUEVO: índice compuesto que acelera la validación por día
+  @@index([whatsappNormalized, appointmentDate])
 }
