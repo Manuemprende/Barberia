@@ -1,33 +1,29 @@
-// src/app/api/auth/login/route.ts
-import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
-import { createSessionCookie, signAuthJWT } from '@/lib/auth'
+import { NextResponse } from 'next/server';
+import { COOKIE_NAME, signAdminJWT } from '@/lib/adminAuth';
 
 export async function POST(req: Request) {
-  try {
-    const { email, password } = await req.json()
+  const { email, password } = await req.json().catch(() => ({} as any));
 
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Falta email o password' }, { status: 400 })
-    }
+  const okEmail = email === process.env.ADMIN_EMAIL;
+  const okPass  = password === process.env.ADMIN_PASSWORD;
 
-    const user = await prisma.user.findUnique({ where: { email } })
-    if (!user || !user.password) {
-      return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 })
-    }
-
-    const ok = await bcrypt.compare(password, user.password)
-    if (!ok) {
-      return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 })
-    }
-
-    const token = await signAuthJWT({ sub: user.id, email: user.email })
-    const res = NextResponse.json({ ok: true })
-    res.headers.set('Set-Cookie', createSessionCookie(token))
-    return res
-  } catch (e) {
-    console.error('POST /api/auth/login error', e)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  if (!okEmail || !okPass) {
+    return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 });
   }
+
+  // 👇 IMPORTANTE: esperar la firma del token
+  const token = await signAdminJWT({ email });
+
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set({
+    name: COOKIE_NAME,
+    value: token,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 7, // 7 días
+  });
+
+  return res;
 }

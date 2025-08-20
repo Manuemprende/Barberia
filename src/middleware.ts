@@ -1,34 +1,37 @@
 // src/middleware.ts
-import { NextResponse, type NextRequest } from 'next/server'
-import { AUTH_COOKIE, verifyAuthJWT } from '@/lib/auth'
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
+
+const COOKIE = 'admin_token';
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl
+  const { pathname } = req.nextUrl;
 
-  // Permitir el login sin token
+  // Permitir la pantalla de login
   if (pathname.startsWith('/admin/login')) {
-    return NextResponse.next()
+    return NextResponse.next();
   }
 
-  // Proteger todo /admin
+  // Proteger /admin/** excepto /admin/login
   if (pathname.startsWith('/admin')) {
-    const token = req.cookies.get(AUTH_COOKIE)?.value
+    const token = req.cookies.get(COOKIE)?.value;
     if (!token) {
-      const url = new URL('/admin/login', req.url)
-      return NextResponse.redirect(url)
+      return NextResponse.redirect(new URL('/admin/login', req.url));
     }
+
     try {
-      await verifyAuthJWT(token)
-      return NextResponse.next()
+      const secret = new TextEncoder().encode(process.env.AUTH_SECRET!);
+      await jwtVerify(token, secret); // lanza si no es válido
+      return NextResponse.next();
     } catch {
-      const url = new URL('/admin/login', req.url)
-      return NextResponse.redirect(url)
+      return NextResponse.redirect(new URL('/admin/login', req.url));
     }
   }
 
-  return NextResponse.next()
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: ['/admin/:path*'],
-}
+};
