@@ -1,20 +1,38 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 
-export async function GET() {
+/**
+ * API de métricas para el dashboard del admin.
+ * Para no depender aún de Prisma, contamos usando tus APIs existentes.
+ * - /api/comments  (GET)  -> totalComentarios
+ * - /api/services  (GET)  -> totalServicios
+ * TODO: si luego expones /api/appointments (GET), añadimos próximas citas reales.
+ */
+export async function GET(req: Request) {
   try {
-    const now = new Date();
-    const start = new Date(now); start.setHours(0,0,0,0);
-    const end   = new Date(now); end.setHours(23,59,59,999);
+    // base URL (soporta local y producción)
+    const origin = new URL(req.url).origin;
 
-    const [totalHoy, totalComentarios, totalServicios, proximas] = await Promise.all([
-      prisma.appointment.count({ where: { start: { gte: start, lte: end } } }),
-      prisma.comment.count(),
-      prisma.service.count(),
-      prisma.appointment.findMany({ where: { start: { gte: now } }, orderBy: { start: 'asc' }, take: 5 })
+    const [commentsRes, servicesRes] = await Promise.all([
+      fetch(`${origin}/api/comments`, { cache: 'no-store' }),
+      fetch(`${origin}/api/services`, { cache: 'no-store' }),
     ]);
 
-    return NextResponse.json({ totalHoy, totalComentarios, totalServicios, proximas });
+    const comments = (await commentsRes.json().catch(() => [])) as unknown[];
+    const services = (await servicesRes.json().catch(() => [])) as unknown[];
+
+    const totalComentarios = Array.isArray(comments) ? comments.length : 0;
+    const totalServicios   = Array.isArray(services) ? services.length : 0;
+
+    // Por ahora no tenemos /api/appointments (GET) público → devolvemos arreglo vacío
+    const proximas: any[] = [];
+    const totalHoy = 0; // cuando tengamos appointments GET filtramos por fecha de hoy
+
+    return NextResponse.json({
+      totalHoy,
+      totalComentarios,
+      totalServicios,
+      proximas,
+    });
   } catch (e) {
     console.error('METRICS ERROR', e);
     return NextResponse.json({ error: 'metrics_failed' }, { status: 500 });
