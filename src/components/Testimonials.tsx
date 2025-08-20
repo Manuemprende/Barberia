@@ -6,7 +6,7 @@ import { Pagination, Navigation, Autoplay } from 'swiper/modules';
 import { FaQuoteLeft, FaUserCircle } from 'react-icons/fa';
 import 'swiper/css';
 import 'swiper/css/pagination';
-import 'swiper/css/navigation';
+//import 'swiper/css/navigation';
 
 type Comment = { id: number; name: string; message: string; createdAt: string };
 
