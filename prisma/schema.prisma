@@ -36,6 +36,24 @@ model Service {
   appointments Appointment[]
 }
 
+model GalleryImage {
+  id        Int       @id @default(autoincrement())
+  url       String    // URL de la imagen
+  title     String?   // Título opcional o descripción
+  createdAt DateTime  @default(now())
+
+  @@map("gallery_images") // opcional: nombre de tabla personalizado
+}
+
+model Comment {
+  id         Int       @id @default(autoincrement())
+  nombre     String
+  comentario String
+  createdAt  DateTime  @default(now())
+
+  @@map("comments") // opcional: nombre de tabla personalizado
+}
+
 // Modelo de la cita.
 model Appointment {
   id                 Int                @id @default(autoincrement())
