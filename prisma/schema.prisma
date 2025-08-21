@@ -76,6 +76,5 @@ model GalleryImage {
   visible   Boolean  @default(true)
   order     Int?
   createdAt DateTime @default(now())
-
   @@map("gallery_images")
 }

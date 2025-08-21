@@ -1,20 +1,26 @@
-﻿'use client';
+﻿// src/components/Gallery.tsx
+
+'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 
 type GalleryItem = {
   id: number | string;
+  // NUEVO: campos reales que devuelve tu API
+  url?: string;
+  alt?: string | null;
+
+  // Compatibilidad con estructura anterior
   title?: string;
-  imageUrl?: string; // preferido
-  src?: string;      // compatibilidad
+  imageUrl?: string;
+  src?: string;
+  visible?: boolean;
 };
 
 export default function Gallery() {
   const [images, setImages] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Lightbox
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const isOpen = openIndex !== null;
 
@@ -31,7 +37,30 @@ export default function Gallery() {
     setOpenIndex((i) => (i! + 1) % images.length);
   }, [openIndex, images.length]);
 
-  // Keyboard navigation
+  // --- NUEVO: función de carga reutilizable ---
+  const fetchImages = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch('/api/gallery?visible=1', { cache: 'no-store' });
+      const data = await res.json();
+      if (Array.isArray(data)) setImages(data);
+      else setImages([]);
+    } catch (err) {
+      console.error('Error al cargar imágenes:', err);
+      setError('No se pudieron cargar las imágenes.');
+      setImages([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Carga inicial
+  useEffect(() => {
+    fetchImages();
+  }, [fetchImages]);
+
+  // Navegación por teclado
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -43,32 +72,43 @@ export default function Gallery() {
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, prev, next]);
 
-  // Fetch
+  // --- NUEVO: refrescar al volver al foco/visibilidad ---
   useEffect(() => {
-    const fetchImages = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch('/api/gallery');
-        const data = await res.json();
-
-        if (Array.isArray(data)) {
-          setImages(data);
-        } else {
-          console.error('Respuesta inválida:', data);
-          setImages([]);
-        }
-      } catch (err) {
-        console.error('Error al cargar imágenes:', err);
-        setError('No se pudieron cargar las imágenes.');
-        setImages([]);
-      } finally {
-        setLoading(false);
-      }
+    const onFocus = () => fetchImages();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') fetchImages();
     };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [fetchImages]);
 
-    fetchImages();
-  }, []);
+  // --- NUEVO: escuchar BroadcastChannel + fallback storage ---
+  useEffect(() => {
+    let ch: BroadcastChannel | null = null;
+
+    try {
+      ch = new BroadcastChannel('gallery');
+      ch.onmessage = (ev) => {
+        if (ev?.data?.type === 'refresh') fetchImages();
+      };
+    } catch {
+      // algunos navegadores antiguos no soportan BroadcastChannel
+    }
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'gallery:refresh') fetchImages();
+    };
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      if (ch) ch.close();
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [fetchImages]);
 
   return (
     <section id="galeria" className="bg-black text-white py-20 px-6">
@@ -103,8 +143,11 @@ export default function Gallery() {
         {!loading && !error && (
           <div className="columns-1 sm:columns-2 lg:columns-3 gap-4">
             {images.map((img, idx) => {
-              const url = img.imageUrl || img.src || '';
-              const title = img.title || 'Imagen';
+              // NUEVO: prioriza url/alt de la API; mantiene compatibilidad
+              const url =
+                img.url || img.imageUrl || img.src || '';
+              const title =
+                (img.alt ?? undefined) || img.title || 'Imagen';
 
               if (!url) return null;
               return (
@@ -144,14 +187,23 @@ export default function Gallery() {
             onClick={(e) => e.stopPropagation()}
           >
             <img
-              src={images[openIndex].imageUrl || images[openIndex].src || ''}
-              alt={images[openIndex].title || 'Imagen'}
+              src={
+                images[openIndex].url ||
+                images[openIndex].imageUrl ||
+                images[openIndex].src ||
+                ''
+              }
+              alt={
+                images[openIndex].alt ??
+                images[openIndex].title ??
+                'Imagen'
+              }
               className="max-h-[80vh] w-full object-contain rounded-lg"
             />
             {/* Caption */}
-            {images[openIndex].title && (
+            {(images[openIndex].alt || images[openIndex].title) && (
               <div className="mt-3 text-center text-gray-300">
-                {images[openIndex].title}
+                {images[openIndex].alt ?? images[openIndex].title}
               </div>
             )}
 

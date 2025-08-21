@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+// 👇 NUEVO
+import LogoutButton from '@/components/LogoutButton';
 
 type Barber = { id: number; name: string };
 type Service = { id: number; name: string; price: number };
@@ -347,9 +349,8 @@ export default function AdminDashboard() {
             <Link href="/admin" className="text-yellow-400">Dashboard</Link>
             <Link href="/admin/citas" className="hover:text-yellow-400">Citas</Link>
             <Link href="/admin/servicios" className="hover:text-yellow-400">Servicios</Link>
-            <form action="/api/auth/logout" method="POST" className="inline">
-              <button className="text-red-300 hover:text-red-400">Salir</button>
-            </form>
+            {/* 👇 REEMPLAZO: botón de logout con toast y redirect */}
+            <LogoutButton />
           </nav>
         </div>
       </header>
