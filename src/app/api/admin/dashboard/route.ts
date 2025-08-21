@@ -17,82 +17,74 @@ import { prisma } from '@/lib/prisma';
  * }
  */
 
-function startOfDay(d = new Date()) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-function endOfDay(d = new Date()) {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
-  return x;
-}
-function startOfWeek(d = new Date()) {
-  // Lunes como inicio de semana
-  const x = new Date(d);
-  const day = x.getDay(); // 0 dom .. 6 sáb
-  const diff = (day === 0 ? -6 : 1 - day); // mover a lunes
-  x.setDate(x.getDate() + diff);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-function startOfMonth(d = new Date()) {
-  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
-}
+// Helpers de fechas (Semana inicia LUNES)
+const startOfDay = (d = new Date()) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-function sumAppointmentsRows(rows: Array<{ priceSnapshot: number; service?: { price: number } | null }>) {
-  return rows.reduce((acc, r) => {
-    const val = r.priceSnapshot && r.priceSnapshot > 0 ? r.priceSnapshot : (r.service?.price ?? 0);
-    return acc + (val || 0);
-  }, 0);
-}
+const endOfDay = (d = new Date()) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+const startOfWeek = (d = new Date()) => {
+  const dt = new Date(d);
+  const day = (dt.getDay() + 6) % 7; // lunes=0
+  dt.setDate(dt.getDate() - day);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+};
+
+const endOfWeek = (d = new Date()) => {
+  const s = startOfWeek(d);
+  return new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6, 23, 59, 59, 999);
+};
+
+const startOfMonth = (d = new Date()) =>
+  new Date(d.getFullYear(), d.getMonth(), 1);
+
+const endOfMonth = (d = new Date()) =>
+  new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
 
 export async function GET() {
   try {
-    const now = new Date();
-    const d0 = startOfDay(now);
-    const d1 = endOfDay(now);
+    const now        = new Date();
+    const todayStart = startOfDay(now);
+    const todayEnd   = endOfDay(now);
+    const weekStart  = startOfWeek(now);
+    const weekEnd    = endOfWeek(now);
+    const monthStart = startOfMonth(now);
+    const monthEnd   = endOfMonth(now);
+    const next24     = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    const w0 = startOfWeek(now);
-    const m0 = startOfMonth(now);
-
-    const next24 = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-    // Ejecutamos todo en paralelo para máxima velocidad
     const [
-      // Citas de hoy (totales y por pago)
+      // Citas de hoy (por start)
       todayAll,
       todayPaid,
       todayUnpaid,
 
-      // Próximas 24h
+      // Próximas 24h (no canceladas)
       upcoming24h,
 
-      // Ingresos por período (solo PAID)
-      revenueDayRows,
-      revenueWeekRows,
-      revenueMonthRows,
+      // Ingresos (sum priceSnapshot) por paidAt en día/semana/mes
+      revDay,
+      revWeek,
+      revMonth,
 
-      // Pagos conteo
+      // Conteos por estado de pago (globales)
       unpaidCount,
       refundedCount,
       paidCount,
 
-      // Comentarios y servicios / barberos
+      // Comentarios y recursos
       visibleCommentsCount,
       latestComments,
       servicesTotal,
       barbersTotal,
     ] = await Promise.all([
-      prisma.appointment.count({ where: { start: { gte: d0, lte: d1 } } }),
-      prisma.appointment.count({ where: { start: { gte: d0, lte: d1 }, paymentStatus: 'PAID' } }),
-      prisma.appointment.count({ where: { start: { gte: d0, lte: d1 }, paymentStatus: 'UNPAID' } }),
+      prisma.appointment.count({ where: { start: { gte: todayStart, lte: todayEnd } } }),
+      prisma.appointment.count({ where: { start: { gte: todayStart, lte: todayEnd }, paymentStatus: 'PAID' } }),
+      prisma.appointment.count({ where: { start: { gte: todayStart, lte: todayEnd }, paymentStatus: 'UNPAID' } }),
 
       prisma.appointment.findMany({
-        where: {
-          start: { gte: now, lte: next24 },
-          status: { not: 'CANCELLED' },
-        },
+        where: { start: { gte: now, lte: next24 }, status: { not: 'CANCELLED' } },
         orderBy: { start: 'asc' },
         take: 10,
         select: {
@@ -103,31 +95,31 @@ export async function GET() {
           end: true,
           status: true,
           paymentStatus: true,
-          barber: { select: { id: true, name: true } },
+          barber:  { select: { id: true, name: true } },
           service: { select: { id: true, name: true, price: true } },
         },
       }),
 
-      prisma.appointment.findMany({
-        where: { paymentStatus: 'PAID', start: { gte: d0, lte: d1 } },
-        select: { priceSnapshot: true, service: { select: { price: true } } },
+      prisma.appointment.aggregate({
+        _sum: { priceSnapshot: true },
+        where: { paymentStatus: 'PAID', paidAt: { gte: todayStart, lte: todayEnd } },
       }),
-      prisma.appointment.findMany({
-        where: { paymentStatus: 'PAID', start: { gte: w0, lte: now } },
-        select: { priceSnapshot: true, service: { select: { price: true } } },
+      prisma.appointment.aggregate({
+        _sum: { priceSnapshot: true },
+        where: { paymentStatus: 'PAID', paidAt: { gte: weekStart, lte: weekEnd } },
       }),
-      prisma.appointment.findMany({
-        where: { paymentStatus: 'PAID', start: { gte: m0, lte: now } },
-        select: { priceSnapshot: true, service: { select: { price: true } } },
+      prisma.appointment.aggregate({
+        _sum: { priceSnapshot: true },
+        where: { paymentStatus: 'PAID', paidAt: { gte: monthStart, lte: monthEnd } },
       }),
 
-      prisma.appointment.count({ where: { paymentStatus: 'UNPAID' } }),
+      prisma.appointment.count({ where: { paymentStatus: 'UNPAID'   } }),
       prisma.appointment.count({ where: { paymentStatus: 'REFUNDED' } }),
-      prisma.appointment.count({ where: { paymentStatus: 'PAID' } }),
+      prisma.appointment.count({ where: { paymentStatus: 'PAID'     } }),
 
       prisma.comment.count({ where: { visible: true } }),
       prisma.comment.findMany({
-        where: { visible: true },
+        where:   { visible: true },
         orderBy: { createdAt: 'desc' },
         take: 5,
         select: { id: true, name: true, message: true, createdAt: true },
@@ -137,20 +129,20 @@ export async function GET() {
     ]);
 
     const revenue = {
-      day:   sumAppointmentsRows(revenueDayRows),
-      week:  sumAppointmentsRows(revenueWeekRows),
-      month: sumAppointmentsRows(revenueMonthRows),
+      day:   revDay._sum?.priceSnapshot   ?? 0,
+      week:  revWeek._sum?.priceSnapshot  ?? 0,
+      month: revMonth._sum?.priceSnapshot ?? 0,
     };
 
     return NextResponse.json({
-      today: { total: todayAll, paid: todayPaid, unpaid: todayUnpaid },
+      today:   { total: todayAll, paid: todayPaid, unpaid: todayUnpaid },
       upcoming24h,
       revenue,
       payments: { unpaidCount, refundedCount, paidCount },
       comments: { visibleCount: visibleCommentsCount, latest: latestComments },
       services: { total: servicesTotal },
-      barbers: { total: barbersTotal },
-      now,
+      barbers:  { total: barbersTotal },
+      now: now.toISOString(),
     });
   } catch (e) {
     console.error('DASHBOARD ERROR', e);

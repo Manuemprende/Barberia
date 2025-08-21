@@ -23,7 +23,9 @@ type Dashboard = {
   barbers: { total: number };
 };
 
-const fmtMoney = (n: number) => `$${new Intl.NumberFormat('es-CL').format(n)}`;
+const clp = (n: number) =>
+  n.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+
 const fmtDT = (iso: string) =>
   new Date(iso).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -34,6 +36,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const load = async () => {
       try {
+        // Si migraste a /api/admin/metrics, puedes cambiar esta URL.
         const r = await fetch('/api/admin/dashboard', { cache: 'no-store' });
         if (!r.ok) throw new Error('dash_err');
         const d = (await r.json()) as Dashboard;
@@ -68,12 +71,13 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+
         {/* KPIs principales */}
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card k="Citas hoy" v={data.today.total} />
-          <Card k="Ingresos hoy" v={fmtMoney(data.revenue.day)} />
-          <Card k="Ingresos semana" v={fmtMoney(data.revenue.week)} />
-          <Card k="Ingresos mes" v={fmtMoney(data.revenue.month)} />
+          <Card k="Ingresos hoy" v={clp(data.revenue.day)} />
+          <Card k="Ingresos semana" v={clp(data.revenue.week)} />
+          <Card k="Ingresos mes" v={clp(data.revenue.month)} />
         </section>
 
         {/* Estado de pagos + recursos */}
@@ -97,28 +101,80 @@ export default function AdminDashboard() {
             <p className="text-gray-400 text-sm">No hay citas próximas.</p>
           ) : (
             <ul className="divide-y divide-white/10 text-sm">
-              {data.upcoming24h.map((a) => (
-                <li key={a.id} className="py-2 flex flex-wrap items-center gap-x-4">
-                  <span className="w-40 text-gray-300">{fmtDT(a.start)}</span>
-                  <span className="flex-1">{a.customerName}</span>
-                  <span className="w-32 text-gray-300">{a.barber?.name ?? '—'}</span>
-                  <span className="w-40 text-gray-300">{a.service?.name ?? '—'}</span>
-                  <span
-                    className={
-                      'rounded px-2 py-0.5 text-xs ' +
-                      (a.status === 'CANCELLED'
-                        ? 'bg-red-900/50 text-red-300 border border-red-700/50'
-                        : a.status === 'COMPLETED'
-                        ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/40'
-                        : a.status === 'CONFIRMED'
-                        ? 'bg-blue-900/40 text-blue-300 border border-blue-700/40'
-                        : 'bg-yellow-900/40 text-yellow-200 border border-yellow-700/40')
-                    }
+              {data.upcoming24h.map((a) => {
+                const phoneDigits = a.whatsapp?.replace(/\D+/g, '') || '';
+                return (
+                  <li
+                    key={a.id}
+                    className="
+                      py-3 gap-3
+                      flex flex-col md:grid
+                      md:grid-cols-[150px_minmax(150px,1fr)_140px_1fr_110px_auto]
+                      md:items-center
+                    "
                   >
-                    {a.status}
-                  </span>
-                </li>
-              ))}
+                    {/* Fecha/Hora */}
+                    <span className="text-gray-300">{fmtDT(a.start)}</span>
+
+                    {/* Cliente + WhatsApp */}
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{a.customerName}</span>
+                      {phoneDigits && (
+                        <a
+                          className="text-yellow-400 hover:text-yellow-300 underline"
+                          href={`https://wa.me/${phoneDigits}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Abrir WhatsApp"
+                        >
+                          {`+${phoneDigits}`}
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Barbero */}
+                    <span className="text-gray-300">{a.barber?.name ?? '—'}</span>
+
+                    {/* Servicio + Precio */}
+                    <div className="flex items-center justify-between md:justify-start md:gap-3">
+                      <span className="text-gray-300">{a.service?.name ?? '—'}</span>
+                      {typeof a.service?.price === 'number' && (
+                        <span className="text-yellow-400 font-semibold">{clp(a.service.price)}</span>
+                      )}
+                    </div>
+
+                    {/* Estado */}
+                    <span
+                      className={
+                        'justify-self-start rounded px-2 py-0.5 text-xs ' +
+                        (a.status === 'CANCELLED'
+                          ? 'bg-red-900/50 text-red-300 border border-red-700/50'
+                          : a.status === 'COMPLETED'
+                          ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/40'
+                          : a.status === 'CONFIRMED'
+                          ? 'bg-blue-900/40 text-blue-300 border border-blue-700/40'
+                          : 'bg-yellow-900/40 text-yellow-200 border border-yellow-700/40')
+                      }
+                    >
+                      {a.status}
+                    </span>
+
+                    {/* Pago */}
+                    <span
+                      className={
+                        'justify-self-start rounded px-2 py-0.5 text-xs ' +
+                        (a.paymentStatus === 'PAID'
+                          ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/40'
+                          : a.paymentStatus === 'REFUNDED'
+                          ? 'bg-purple-900/40 text-purple-300 border border-purple-700/40'
+                          : 'bg-gray-800 text-gray-300 border border-gray-700/50')
+                      }
+                    >
+                      {a.paymentStatus}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>

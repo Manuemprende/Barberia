@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { FiXCircle, FiRotateCcw, FiDollarSign, FiSlash } from 'react-icons/fi';
 
 type Barber = { id: number; name: string };
 type Service = { id: number; name: string; price: number };
@@ -14,50 +13,21 @@ type Appointment = {
   end: string;   // ISO
   status: 'SCHEDULED' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
   paymentStatus: 'UNPAID' | 'PAID' | 'REFUNDED';
-  paidAt?: string | null;
   barber?: Barber | null;
   service?: Service | null;
 };
 
-const fmt = (iso: string) =>
+const fmtDT = (iso: string) =>
   new Date(iso).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
 
-// ------- UI helpers -------
-function StatusBadge({ s }: { s: Appointment['status'] }) {
-  const base =
-    'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium border';
-  if (s === 'CANCELLED')
-    return <span className={`${base} border-red-700/50 bg-red-900/40 text-red-200`}>CANCELLED</span>;
-  if (s === 'COMPLETED')
-    return <span className={`${base} border-emerald-700/40 bg-emerald-900/30 text-emerald-200`}>COMPLETED</span>;
-  if (s === 'CONFIRMED')
-    return <span className={`${base} border-blue-700/40 bg-blue-900/30 text-blue-200`}>CONFIRMED</span>;
-  return <span className={`${base} border-yellow-700/40 bg-yellow-900/30 text-yellow-200`}>SCHEDULED</span>;
-}
-
-function PaymentBadge({ p, paidAt }: { p: Appointment['paymentStatus']; paidAt?: string | null }) {
-  const base =
-    'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium border';
-  if (p === 'PAID')
-    return (
-      <span
-        className={`${base} border-emerald-700/40 bg-emerald-900/30 text-emerald-200`}
-        title={paidAt ? `Pagada: ${fmt(paidAt)}` : undefined}
-      >
-        PAID
-      </span>
-    );
-  if (p === 'REFUNDED')
-    return <span className={`${base} border-blue-700/40 bg-blue-900/30 text-blue-200`}>REFUNDED</span>;
-  return <span className={`${base} border-gray-600 bg-gray-800 text-gray-300`}>UNPAID</span>;
-}
+const clp = (n: number | undefined) =>
+  typeof n === 'number' ? n.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }) : '—';
 
 export default function AdminCitasPage() {
   const [items, setItems] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<'ALL' | Appointment['status']>('ALL');
-  const [range, setRange] = useState<'today' | 'upcoming' | 'all'>('upcoming');
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const [range, setRange] = useState<'today' | 'upcoming' | 'all'>('today');
 
   const query = useMemo(() => {
     const qs = new URLSearchParams();
@@ -74,10 +44,6 @@ export default function AdminCitasPage() {
       const r = await fetch(query, { cache: 'no-store' });
       const data = (await r.json().catch(() => [])) as Appointment[];
       setItems(Array.isArray(data) ? data : []);
-      // fallback: si no hay "hoy" cambiamos a "próximas"
-      if (range === 'today' && Array.isArray(data) && data.length === 0) {
-        setRange('upcoming');
-      }
     } finally {
       setLoading(false);
     }
@@ -88,50 +54,45 @@ export default function AdminCitasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
+  const updateRow = (id: number, patch: Partial<Appointment>) =>
+    setItems(prev => prev.map(x => x.id === id ? { ...x, ...patch } : x));
+
   const toggleCancel = async (id: number, current: Appointment['status']) => {
-    setBusyId(id);
-    try {
-      const next = current === 'CANCELLED' ? 'SCHEDULED' : 'CANCELLED';
-      const r = await fetch(`/api/appointments/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: next }),
-      });
-      if (!r.ok) throw new Error();
-      setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status: next } : x)));
-    } catch {
-      alert('No se pudo actualizar la cita.');
-    } finally {
-      setBusyId(null);
-    }
+    const next = current === 'CANCELLED' ? 'SCHEDULED' : 'CANCELLED';
+    const r = await fetch(`/api/appointments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: next }),
+    });
+    if (r.ok) updateRow(id, { status: next });
+    else alert('No se pudo actualizar la cita.');
   };
 
-  const togglePaid = async (id: number, current: Appointment['paymentStatus']) => {
-    setBusyId(id);
-    try {
-      const body = current === 'PAID' ? { unsetPaid: true } : { setPaidNow: true };
-      const r = await fetch(`/api/appointments/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) throw new Error();
-      setItems((prev) =>
-        prev.map((x) =>
-          x.id === id
-            ? {
-                ...x,
-                paymentStatus: body.unsetPaid ? 'UNPAID' : 'PAID',
-                paidAt: body.unsetPaid ? null : new Date().toISOString(),
-              }
-            : x
-        )
-      );
-    } catch {
-      alert('No se pudo actualizar el pago.');
-    } finally {
-      setBusyId(null);
-    }
+  const markPaid = async (id: number) => {
+    const r = await fetch(`/api/appointments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentStatus: 'PAID' }),
+    });
+    if (r.ok) updateRow(id, { paymentStatus: 'PAID' });
+  };
+
+  const markUnpaid = async (id: number) => {
+    const r = await fetch(`/api/appointments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentStatus: 'UNPAID' }),
+    });
+    if (r.ok) updateRow(id, { paymentStatus: 'UNPAID' });
+  };
+
+  const markRefund = async (id: number) => {
+    const r = await fetch(`/api/appointments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentStatus: 'REFUNDED' }),
+    });
+    if (r.ok) updateRow(id, { paymentStatus: 'REFUNDED' });
   };
 
   return (
@@ -187,12 +148,13 @@ export default function AdminCitasPage() {
 
           <button
             onClick={load}
-            className="ml-auto bg-yellow-600 hover:bg-yellow-500 text-black rounded px-3 py-1.5 text-sm"
+            className="ml-auto bg-yellow-600 hover:bg-yellow-500 text-black rounded px-3 py-1 text-sm"
           >
             Refrescar
           </button>
         </div>
 
+        {/* Tabla */}
         <div className="overflow-x-auto rounded-xl border border-yellow-600">
           <table className="min-w-full text-sm">
             <thead className="bg-[#1b1b1b] text-gray-300">
@@ -200,6 +162,7 @@ export default function AdminCitasPage() {
                 <th className="px-3 py-2 text-left">Cliente</th>
                 <th className="px-3 py-2 text-left">WhatsApp</th>
                 <th className="px-3 py-2 text-left">Servicio</th>
+                <th className="px-3 py-2 text-left">Precio</th>
                 <th className="px-3 py-2 text-left">Barbero</th>
                 <th className="px-3 py-2 text-left">Inicio</th>
                 <th className="px-3 py-2 text-left">Fin</th>
@@ -210,91 +173,97 @@ export default function AdminCitasPage() {
             </thead>
             <tbody className="divide-y divide-white/10">
               {loading ? (
-                <tr><td colSpan={9} className="px-3 py-6 text-center text-gray-400">Cargando…</td></tr>
+                <tr><td colSpan={10} className="px-3 py-6 text-center text-gray-400">Cargando…</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={9} className="px-3 py-6 text-center text-gray-400">Sin resultados.</td></tr>
+                <tr><td colSpan={10} className="px-3 py-6 text-center text-gray-400">Sin resultados.</td></tr>
               ) : (
-                items.map((a) => (
-                  <tr key={a.id} className="bg-[#131313]">
-                    <td className="px-3 py-2">{a.customerName}</td>
-                    <td className="px-3 py-2">
-                      <a
-                        className="text-yellow-400 hover:text-yellow-300"
-                        href={`https://wa.me/${a.whatsapp.replace(/\D+/g, '')}`}
-                        target="_blank"
-                      >
-                        {a.whatsapp}
-                      </a>
-                    </td>
-                    <td className="px-3 py-2">{a.service?.name ?? '—'}</td>
-                    <td className="px-3 py-2">{a.barber?.name ?? '—'}</td>
-                    <td className="px-3 py-2">{fmt(a.start)}</td>
-                    <td className="px-3 py-2">{fmt(a.end)}</td>
-                    <td className="px-3 py-2"><StatusBadge s={a.status} /></td>
-                    <td className="px-3 py-2"><PaymentBadge p={a.paymentStatus} paidAt={a.paidAt} /></td>
-                    <td className="px-3 py-2">
-                      <div className="inline-flex items-center gap-2">
-                        {/* Cancelar/Reactivar */}
-                        <button
-                          onClick={() => toggleCancel(a.id, a.status)}
-                          disabled={busyId === a.id}
+                items.map((a) => {
+                  const phone = a.whatsapp?.replace(/\D+/g, '') || '';
+                  return (
+                    <tr key={a.id} className="bg-[#131313] align-middle">
+                      <td className="px-3 py-2">{a.customerName}</td>
+                      <td className="px-3 py-2">
+                        {phone ? (
+                          <a className="text-yellow-400 hover:text-yellow-300" href={`https://wa.me/${phone}`} target="_blank">
+                            +{phone}
+                          </a>
+                        ) : '—'}
+                      </td>
+                      <td className="px-3 py-2">{a.service?.name ?? '—'}</td>
+                      <td className="px-3 py-2">{clp(a.service?.price)}</td>
+                      <td className="px-3 py-2">{a.barber?.name ?? '—'}</td>
+                      <td className="px-3 py-2">{fmtDT(a.start)}</td>
+                      <td className="px-3 py-2">{fmtDT(a.end)}</td>
+                      <td className="px-3 py-2">
+                        <span
                           className={
-                            'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ' +
-                            'border transition-colors ' +
+                            'rounded px-2 py-0.5 text-xs ' +
                             (a.status === 'CANCELLED'
-                              ? 'bg-yellow-900/30 border-yellow-700/40 text-yellow-200 hover:bg-yellow-900/50'
-                              : 'bg-red-900/30 border-red-700/40 text-red-200 hover:bg-red-900/50') +
-                            (busyId === a.id ? ' opacity-60 cursor-not-allowed' : '')
+                              ? 'bg-red-900/50 text-red-300 border border-red-700/50'
+                              : a.status === 'COMPLETED'
+                              ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/40'
+                              : a.status === 'CONFIRMED'
+                              ? 'bg-blue-900/40 text-blue-300 border border-blue-700/40'
+                              : 'bg-yellow-900/40 text-yellow-200 border border-yellow-700/40')
                           }
-                          title={a.status === 'CANCELLED' ? 'Reactivar' : 'Cancelar'}
                         >
-                          {busyId === a.id ? (
-                            <span>...</span>
-                          ) : a.status === 'CANCELLED' ? (
-                            <>
-                              <FiRotateCcw className="text-yellow-300" />
-                              Reactivar
-                            </>
-                          ) : (
-                            <>
-                              <FiXCircle className="text-red-300" />
-                              Cancelar
-                            </>
-                          )}
-                        </button>
-
-                        {/* Pagada / Desmarcar */}
-                        <button
-                          onClick={() => togglePaid(a.id, a.paymentStatus)}
-                          disabled={busyId === a.id || a.status === 'CANCELLED'}
+                          {a.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
                           className={
-                            'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ' +
-                            'border transition-colors ' +
+                            'rounded px-2 py-0.5 text-xs ' +
                             (a.paymentStatus === 'PAID'
-                              ? 'bg-gray-800 border-gray-600 text-gray-200 hover:bg-gray-700'
-                              : 'bg-emerald-900/30 border-emerald-700/40 text-emerald-200 hover:bg-emerald-900/50') +
-                            (busyId === a.id || a.status === 'CANCELLED' ? ' opacity-60 cursor-not-allowed' : '')
+                              ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/40'
+                              : a.paymentStatus === 'REFUNDED'
+                              ? 'bg-purple-900/40 text-purple-300 border border-purple-700/40'
+                              : 'bg-gray-800 text-gray-300 border border-gray-700/50')
                           }
-                          title={a.paymentStatus === 'PAID' ? 'Marcar NO pagada' : 'Marcar pagada'}
                         >
-                          {busyId === a.id ? (
-                            <span>...</span>
-                          ) : a.paymentStatus === 'PAID' ? (
-                            <>
-                              <FiSlash className="text-gray-300" />
-                              Desmarcar
-                            </>
-                          ) : (
-                            <>
-                              <FiDollarSign className="text-emerald-300" />
+                          {a.paymentStatus}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {/* Botonera responsive: en móvil ocupan toda la fila */}
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => toggleCancel(a.id, a.status)}
+                            className="px-3 py-1 rounded bg-yellow-600 hover:bg-yellow-500 text-black text-xs sm:text-sm"
+                            title={a.status === 'CANCELLED' ? 'Reactivar' : 'Cancelar'}
+                          >
+                            {a.status === 'CANCELLED' ? 'Reactivar' : 'Cancelar'}
+                          </button>
+
+                          {a.paymentStatus !== 'PAID' && (
+                            <button
+                              onClick={() => markPaid(a.id)}
+                              className="px-3 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-xs sm:text-sm"
+                            >
                               Pagada
-                            </>
+                            </button>
                           )}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          {a.paymentStatus !== 'UNPAID' && (
+                            <button
+                              onClick={() => markUnpaid(a.id)}
+                              className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white text-xs sm:text-sm"
+                            >
+                              Impaga
+                            </button>
+                          )}
+                          {a.paymentStatus !== 'REFUNDED' && (
+                            <button
+                              onClick={() => markRefund(a.id)}
+                              className="px-3 py-1 rounded bg-purple-700 hover:bg-purple-600 text-white text-xs sm:text-sm"
+                            >
+                              Reembolso
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
