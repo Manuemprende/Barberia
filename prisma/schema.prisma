@@ -1,17 +1,12 @@
-// Conecta Prisma con tu base de datos.
-// Sustituye "postgresql" por "sqlite", "mysql" u otro proveedor si corresponde,
-// y asegúrate de que DATABASE_URL esté definida en tu .env.
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// Genera el cliente de Prisma para TypeScript/JavaScript.
 generator client {
   provider = "prisma-client-js"
 }
 
-// Enum para el estado de las citas.
 enum AppointmentStatus {
   SCHEDULED
   CONFIRMED
@@ -19,21 +14,18 @@ enum AppointmentStatus {
   COMPLETED
 }
 
-// 👇 Enum para estado de pago (nuevo)
 enum PaymentStatus {
   UNPAID
   PAID
   REFUNDED
 }
 
-// Modelo del barbero.
 model Barber {
   id           Int           @id @default(autoincrement())
   name         String
   appointments Appointment[]
 }
 
-// Modelo del servicio.
 model Service {
   id           Int           @id @default(autoincrement())
   name         String
@@ -42,54 +34,48 @@ model Service {
   appointments Appointment[]
 }
 
-model GalleryImage {
-  id        Int      @id @default(autoincrement())
-  url       String // URL de la imagen
-  title     String? // Título opcional o descripción
-  createdAt DateTime @default(now())
-
-  @@map("gallery_images") // opcional: nombre de tabla personalizado
-}
-
 model Comment {
   id        Int      @id @default(autoincrement())
   name      String
   message   String
   createdAt DateTime @default(now())
-  // 👇 moderación (nuevo)
   visible   Boolean  @default(true)
 
-  @@map("comments") // opcional: nombre de tabla personalizado
+  @@map("comments")
 }
 
-// Modelo de la cita.
 model Appointment {
-  id                 Int               @id @default(autoincrement())
-  customerName       String
-  whatsapp           String
-  /// Solo dígitos para comparaciones (útil para buscar por número normalizado)
-  whatsappNormalized String            @default("")
-  barber             Barber            @relation(fields: [barberId], references: [id])
-  barberId           Int
-  service            Service           @relation(fields: [serviceId], references: [id])
-  serviceId          Int
-  start              DateTime
-  end                DateTime
-  /// Fecha de la cita (sin hora) para limitar a una cita por día
-  appointmentDate    DateTime          @default(now()) @db.Date
-  status             AppointmentStatus @default(SCHEDULED)
-  notes              String?
-  createdAt          DateTime          @default(now())
+  id                  Int               @id @default(autoincrement())
+  customerName        String
+  whatsapp            String
+  whatsappNormalized  String            @default("")
+  barber              Barber            @relation(fields: [barberId], references: [id])
+  barberId            Int
+  service             Service           @relation(fields: [serviceId], references: [id])
+  serviceId           Int
+  start               DateTime
+  end                 DateTime
+  appointmentDate     DateTime          @default(now()) @db.Date
+  status              AppointmentStatus @default(SCHEDULED)
+  notes               String?
+  createdAt           DateTime          @default(now())
+  paymentStatus       PaymentStatus     @default(UNPAID)
+  paidAt              DateTime?
+  priceSnapshot       Int               @default(0)
 
-  // 👇 pagos (nuevo)
-  paymentStatus PaymentStatus @default(UNPAID)
-  paidAt        DateTime?
-  /// Precio congelado al agendar (CLP); usa service.price al crear
-  priceSnapshot Int           @default(0)
-
-  // Índices para acelerar consultas por barbero y servicio
   @@index([barberId, start, end])
   @@index([serviceId])
-  // Índice compuesto para validar una cita por día por número normalizado
   @@index([whatsappNormalized, appointmentDate])
+}
+
+/* 👇 ÚNICA definición de GalleryImage */
+model GalleryImage {
+  id        Int      @id @default(autoincrement())
+  url       String
+  alt       String?  @db.VarChar(180)
+  visible   Boolean  @default(true)
+  order     Int?
+  createdAt DateTime @default(now())
+
+  @@map("gallery_images")
 }

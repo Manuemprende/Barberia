@@ -21,20 +21,39 @@ const fmtDT = (iso: string) =>
   new Date(iso).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
 
 const clp = (n: number | undefined) =>
-  typeof n === 'number' ? n.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }) : '—';
+  typeof n === 'number'
+    ? n.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 })
+    : '—';
+
+const PAGE_SIZE = 10;
+
+/* WhatsApp con mensaje prellenado */
+const waReminderLink = (a: Appointment) => {
+  const phone = a.whatsapp?.replace(/\D+/g, '');
+  if (!phone) return '#';
+
+  const fecha = fmtDT(a.start);
+  const servicio = a.service?.name ?? 'tu servicio';
+  const barbero  = a.barber?.name ? ` con ${a.barber?.name}` : '';
+  const texto = `Hola ${a.customerName}, te recordamos tu cita en *Corte Maestro* para *${servicio}*${barbero} el *${fecha}*.
+Por favor confirma tu asistencia respondiendo este mensaje. ¡Te esperamos! 💈✂️`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(texto)}`;
+};
 
 export default function AdminCitasPage() {
   const [items, setItems] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<'ALL' | Appointment['status']>('ALL');
   const [range, setRange] = useState<'today' | 'upcoming' | 'all'>('today');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
 
   const query = useMemo(() => {
     const qs = new URLSearchParams();
     if (range === 'today') qs.set('today', '1');
     if (range === 'upcoming') qs.set('upcoming', '1');
     if (status !== 'ALL') qs.set('status', status);
-    qs.set('limit', '100');
+    qs.set('limit', '200'); // traemos más y paginamos en cliente
     return `/api/appointments?${qs.toString()}`;
   }, [status, range]);
 
@@ -44,6 +63,7 @@ export default function AdminCitasPage() {
       const r = await fetch(query, { cache: 'no-store' });
       const data = (await r.json().catch(() => [])) as Appointment[];
       setItems(Array.isArray(data) ? data : []);
+      setPage(1); // reset al cambiar filtros
     } finally {
       setLoading(false);
     }
@@ -55,45 +75,54 @@ export default function AdminCitasPage() {
   }, [query]);
 
   const updateRow = (id: number, patch: Partial<Appointment>) =>
-    setItems(prev => prev.map(x => x.id === id ? { ...x, ...patch } : x));
+    setItems(prev => prev.map(x => (x.id === id ? { ...x, ...patch } : x)));
 
-  const toggleCancel = async (id: number, current: Appointment['status']) => {
-    const next = current === 'CANCELLED' ? 'SCHEDULED' : 'CANCELLED';
-    const r = await fetch(`/api/appointments/${id}`, {
+  // ---- Acciones necesarias ----
+  const patch = (id: number, body: any) =>
+    fetch(`/api/appointments/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: next }),
+      body: JSON.stringify(body),
     });
-    if (r.ok) updateRow(id, { status: next });
-    else alert('No se pudo actualizar la cita.');
+
+  const confirm = async (id: number) => {
+    const r = await patch(id, { status: 'CONFIRMED' });
+    if (r.ok) updateRow(id, { status: 'CONFIRMED' });
+    else alert('No se pudo confirmar la cita.');
+  };
+
+  const cancel = async (id: number) => {
+    const r = await patch(id, { status: 'CANCELLED' });
+    if (r.ok) updateRow(id, { status: 'CANCELLED' });
+    else alert('No se pudo anular la cita.');
   };
 
   const markPaid = async (id: number) => {
-    const r = await fetch(`/api/appointments/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentStatus: 'PAID' }),
-    });
+    const r = await patch(id, { paymentStatus: 'PAID', paidAt: new Date().toISOString() });
     if (r.ok) updateRow(id, { paymentStatus: 'PAID' });
+    else alert('No se pudo marcar como pagada.');
   };
 
-  const markUnpaid = async (id: number) => {
-    const r = await fetch(`/api/appointments/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentStatus: 'UNPAID' }),
+  // ---- Búsqueda + paginación en cliente ----
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter(a => {
+      const pool = [
+        a.customerName,
+        a.whatsapp,
+        a.service?.name ?? '',
+        a.barber?.name ?? '',
+      ]
+        .join(' ')
+        .toLowerCase();
+      return pool.includes(term);
     });
-    if (r.ok) updateRow(id, { paymentStatus: 'UNPAID' });
-  };
+  }, [items, q]);
 
-  const markRefund = async (id: number) => {
-    const r = await fetch(`/api/appointments/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentStatus: 'REFUNDED' }),
-    });
-    if (r.ok) updateRow(id, { paymentStatus: 'REFUNDED' });
-  };
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   return (
     <div className="min-h-[80vh] text-white">
@@ -113,10 +142,10 @@ export default function AdminCitasPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+        {/* Filtros + búsqueda */}
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-2xl font-bold mr-2">Citas</h2>
 
-          {/* Rango rápido */}
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-400">Rango:</label>
             <select
@@ -130,7 +159,6 @@ export default function AdminCitasPage() {
             </select>
           </div>
 
-          {/* Filtro estado */}
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-400">Estado:</label>
             <select
@@ -145,6 +173,13 @@ export default function AdminCitasPage() {
               <option value="CANCELLED">Canceladas</option>
             </select>
           </div>
+
+          <input
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setPage(1); }}
+            placeholder="Buscar: cliente, WhatsApp, servicio, barbero…"
+            className="min-w-[240px] flex-1 bg-[#131313] border border-yellow-600 rounded px-3 py-1 text-sm"
+          />
 
           <button
             onClick={load}
@@ -174,10 +209,10 @@ export default function AdminCitasPage() {
             <tbody className="divide-y divide-white/10">
               {loading ? (
                 <tr><td colSpan={10} className="px-3 py-6 text-center text-gray-400">Cargando…</td></tr>
-              ) : items.length === 0 ? (
+              ) : paged.length === 0 ? (
                 <tr><td colSpan={10} className="px-3 py-6 text-center text-gray-400">Sin resultados.</td></tr>
               ) : (
-                items.map((a) => {
+                paged.map((a) => {
                   const phone = a.whatsapp?.replace(/\D+/g, '') || '';
                   return (
                     <tr key={a.id} className="bg-[#131313] align-middle">
@@ -225,40 +260,44 @@ export default function AdminCitasPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2">
-                        {/* Botonera responsive: en móvil ocupan toda la fila */}
+                        {/* Solo estos 4 botones, responsive y ordenados */}
                         <div className="flex flex-wrap gap-2">
                           <button
-                            onClick={() => toggleCancel(a.id, a.status)}
-                            className="px-3 py-1 rounded bg-yellow-600 hover:bg-yellow-500 text-black text-xs sm:text-sm"
-                            title={a.status === 'CANCELLED' ? 'Reactivar' : 'Cancelar'}
+                            onClick={() => confirm(a.id)}
+                            disabled={a.status === 'CONFIRMED' || a.status === 'CANCELLED'}
+                            className="px-3 py-1 rounded bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white text-xs sm:text-sm"
+                            title="Confirmar"
                           >
-                            {a.status === 'CANCELLED' ? 'Reactivar' : 'Cancelar'}
+                            Confirmar
                           </button>
 
-                          {a.paymentStatus !== 'PAID' && (
-                            <button
-                              onClick={() => markPaid(a.id)}
-                              className="px-3 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-xs sm:text-sm"
-                            >
-                              Pagada
-                            </button>
-                          )}
-                          {a.paymentStatus !== 'UNPAID' && (
-                            <button
-                              onClick={() => markUnpaid(a.id)}
-                              className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white text-xs sm:text-sm"
-                            >
-                              Impaga
-                            </button>
-                          )}
-                          {a.paymentStatus !== 'REFUNDED' && (
-                            <button
-                              onClick={() => markRefund(a.id)}
-                              className="px-3 py-1 rounded bg-purple-700 hover:bg-purple-600 text-white text-xs sm:text-sm"
-                            >
-                              Reembolso
-                            </button>
-                          )}
+                          <button
+                            onClick={() => cancel(a.id)}
+                            disabled={a.status === 'CANCELLED'}
+                            className="px-3 py-1 rounded bg-yellow-600 hover:bg-yellow-500 disabled:opacity-40 text-black text-xs sm:text-sm"
+                            title="Anular (Cancelar)"
+                          >
+                            Anular
+                          </button>
+
+                          <button
+                            onClick={() => markPaid(a.id)}
+                            disabled={a.paymentStatus === 'PAID'}
+                            className="px-3 py-1 rounded bg-teal-700 hover:bg-teal-600 disabled:opacity-40 text-white text-xs sm:text-sm"
+                            title="Marcar como pagado"
+                          >
+                            Pagado
+                          </button>
+
+                          <a
+                            href={waReminderLink(a)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-3 py-1 rounded bg-green-700 hover:bg-green-600 text-white text-xs sm:text-sm"
+                            title="Enviar recordatorio por WhatsApp"
+                          >
+                            WhatsApp
+                          </a>
                         </div>
                       </td>
                     </tr>
@@ -268,6 +307,32 @@ export default function AdminCitasPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Paginación */}
+        <div className="flex items-center justify-center gap-2">
+          <button
+            disabled={pageSafe === 1}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            className="px-3 py-1 rounded border border-yellow-600 text-yellow-400 disabled:opacity-40"
+          >
+            ← Anterior
+          </button>
+          <span className="text-sm text-gray-400">
+            Página {pageSafe} / {totalPages} · {filtered.length} resultados
+          </span>
+          <button
+            disabled={pageSafe >= totalPages}
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            className="px-3 py-1 rounded border border-yellow-600 text-yellow-400 disabled:opacity-40"
+          >
+            Siguiente →
+          </button>
+        </div>
+
+        {/* Ayuda sobre pop-ups */}
+        <p className="text-xs text-gray-400 text-center">
+          Si el navegador bloquea las pestañas de WhatsApp, habilita los pop-ups para tu dominio del admin.
+        </p>
       </main>
     </div>
   );

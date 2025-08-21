@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion } from "framer-motion";
 import { FaCut, FaUserTie, FaPaintBrush, FaHotTub, FaRegClock } from 'react-icons/fa'
 
 // Define the type for a single service based on the Prisma schema
