@@ -1,3 +1,7 @@
+// src/app/api/appointments/summary/route.ts
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -5,12 +9,18 @@ export async function GET(req: Request) {
     if (!date) return NextResponse.json({ rows: [], grandTotal: 0 })
 
     // usar la misma fecha 'date' (00:00:00 implícito porque es @db.Date)
-    const target = new Date(`${date}T00:00:00`)
+    // Alternativa robusta por husos horarios:
+    const dayStart = new Date(`${date}T00:00:00`);
+    const dayEnd = new Date(`${date}T23:59:59.999`);
 
     const paid = await prisma.appointment.findMany({
-      where: { status: 'COMPLETED', appointmentDate: target },
+      where: {
+        status: 'COMPLETED',
+        // usar start en rango si prefieres no depender de appointmentDate
+        start: { gte: dayStart, lte: dayEnd },
+      },
       include: { service: true },
-    })
+    });
 
     const map = new Map<number, { name: string; count: number; total: number }>()
     for (const a of paid) {
