@@ -2,6 +2,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 export const runtime = 'nodejs';
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+
 
 
 const normalizePhone = (s: string) => s.replace(/\D+/g, '');
