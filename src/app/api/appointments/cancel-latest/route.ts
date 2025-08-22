@@ -1,41 +1,56 @@
 // src/app/api/appointments/cancel-latest/route.ts
+export const runtime = 'nodejs';
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
-import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'; // ✅ ESTA ES LA BUENA
+const normalizePhone = (s: string) => s.replace(/\D+/g, '');
 
 export async function POST(req: Request) {
   try {
-    const { whatsapp } = await req.json()
+    const { whatsapp } = await req.json().catch(() => ({} as any));
 
-    if (!whatsapp) {
+    if (!whatsapp || typeof whatsapp !== 'string' || !whatsapp.trim()) {
       return NextResponse.json(
         { error: 'Número de WhatsApp es requerido.' },
         { status: 400 }
-      )
+      );
     }
 
-    // Buscar la última cita de ese número
+    const phoneNorm = normalizePhone(whatsapp);
+
+    // Última cita de ese número que NO esté cancelada
     const lastAppointment = await prisma.appointment.findFirst({
-      where: { whatsapp },
-      orderBy: { start: 'desc' }
-    })
+      where: {
+        whatsappNormalized: phoneNorm,
+        status: { not: 'CANCELLED' },
+      },
+      orderBy: { start: 'desc' },
+      select: { id: true, status: true },
+    });
 
     if (!lastAppointment) {
       return NextResponse.json(
-        { error: 'No se encontró ninguna cita con ese número.' },
+        { error: 'No se encontró ninguna cita activa con ese número.' },
         { status: 404 }
-      )
+      );
     }
 
-    // Eliminar la cita
-    await prisma.appointment.delete({ where: { id: lastAppointment.id } })
+    // Opción A (recomendada): marcar como CANCELLED
+    const updated = await prisma.appointment.update({
+      where: { id: lastAppointment.id },
+      data: { status: 'CANCELLED' },
+      select: { id: true, status: true },
+    });
 
-    return NextResponse.json({ success: true, deletedId: lastAppointment.id })
+    // Opción B (si de verdad quieres eliminar):
+    // await prisma.appointment.delete({ where: { id: lastAppointment.id } });
+
+    return NextResponse.json({ success: true, id: updated.id, status: updated.status });
   } catch (error) {
-    console.error('[CANCEL_LATEST_APPOINTMENT]', error)
+    console.error('[CANCEL_LATEST_APPOINTMENT]', error);
     return NextResponse.json(
       { error: 'Ocurrió un error al cancelar la cita.' },
       { status: 500 }
-    )
+    );
   }
 }

@@ -1,6 +1,7 @@
 // src/app/api/admin/metrics/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+export const runtime = 'nodejs';
 
 // Helpers de fechas (semana inicia LUNES)
 const startOfDay = (d = new Date()) =>
