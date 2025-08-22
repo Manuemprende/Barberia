@@ -1,6 +1,8 @@
 // src/app/api/gallery/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+export const runtime = 'nodejs';
+
 
 // Convierte valores variados a booleano (true/false/"true"/"false"/1/0)
 function toBool(v: unknown): boolean | null {

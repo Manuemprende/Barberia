@@ -1,6 +1,8 @@
 // src/app/api/appointments/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+export const runtime = 'nodejs';
+
 
 type Status = 'SCHEDULED' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
 type PaymentStatus = 'UNPAID' | 'PAID' | 'REFUNDED';

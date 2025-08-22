@@ -1,6 +1,8 @@
 // src/app/api/services/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+export const runtime = 'nodejs';
+
 
 // GET /api/services -> listar servicios
 export async function GET() {

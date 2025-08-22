@@ -1,6 +1,8 @@
 // src/app/api/appointments/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+export const runtime = 'nodejs';
+
 
 const normalizePhone = (s: string) => s.replace(/\D+/g, '');
 

@@ -1,6 +1,8 @@
 // src/app/api/barbers/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+export const runtime = 'nodejs';
+
 
 // GET /api/barbers -> listar barberos
 export async function GET() {

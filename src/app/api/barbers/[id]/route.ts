@@ -1,6 +1,8 @@
 // src/app/api/barbers/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+export const runtime = 'nodejs';
+
 
 // PATCH /api/barbers/:id  -> actualizar nombre
 export async function PATCH(

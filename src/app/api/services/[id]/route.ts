@@ -1,6 +1,8 @@
 // src/app/api/services/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+export const runtime = 'nodejs';
+
 
 // PATCH /api/services/:id -> actualizar { name?, price?, duration? }
 export async function PATCH(
