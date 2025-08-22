@@ -1,6 +1,7 @@
 //src/app/api/admin/dashboard/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+export const runtime = 'nodejs';
 
 /**
  * Dashboard Admin – KPIs en una llamada
