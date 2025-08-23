@@ -49,7 +49,7 @@ export default function Navbar() {
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-black shadow-md">
       <nav className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between text-white">
-        <a href="#hero" className="text-2xl font-bold text-yellow-500">Corte Maestro</a>
+        <a href="#hero" className="text-2xl font-bold text-yellow-500">Danny The Barber</a>
 
         <ul className="hidden md:flex gap-6 items-center text-sm font-semibold mx-auto">
           {navLinks.map((link) => (
