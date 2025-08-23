@@ -344,7 +344,7 @@ export default function AdminDashboard() {
       {/* Header */}
       <header className="border-b border-yellow-600 bg-[#0e0e0e]">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-yellow-500">Corte Maestro · Admin</h1>
+          <h1 className="text-lg font-semibold text-yellow-500">Danny The Barber · Admin</h1>
           <nav className="flex items-center gap-5 text-sm">
             <Link href="/admin" className="text-yellow-400">Dashboard</Link>
             <Link href="/admin/citas" className="hover:text-yellow-400">Citas</Link>

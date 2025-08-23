@@ -35,7 +35,7 @@ export default function AdminLoginPage() {
   return (
     <main className="min-h-screen bg-black flex items-center justify-center px-6">
       <form onSubmit={onSubmit} className="w-full max-w-sm bg-zinc-900 border border-zinc-800 p-6 rounded-xl space-y-4">
-        <h1 className="text-2xl font-bold text-yellow-500 text-center">Corte Maestro · Admin</h1>
+        <h1 className="text-2xl font-bold text-yellow-500 text-center">Danny The Barber · Admin</h1>
         <input
           type="email"
           placeholder="Correo"
