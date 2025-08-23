@@ -1,7 +1,7 @@
-//src/components/CancelBooking.tsx 
+// src/components/CancelBooking.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import { Phone, Trash2 } from 'lucide-react'
 
@@ -9,11 +9,19 @@ export default function CancelBooking() {
   const [whatsapp, setWhatsapp] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Mostrar con prefijo país si el usuario no lo escribe
+  const displayValue = useMemo(() => {
+    const v = whatsapp.trim()
+    if (!v) return '+56'
+    if (v.startsWith('+') || v.startsWith('56')) return v
+    return `+56${v}`
+  }, [whatsapp])
+
   const normalize = (s: string) => s.replace(/\D+/g, '')
 
   const handleCancel = async (e: React.FormEvent) => {
     e.preventDefault()
-    const phone = normalize(whatsapp)
+    const phone = normalize(displayValue) // solo dígitos
 
     if (!phone || phone.length < 8) {
       toast.error('Ingresa un WhatsApp válido')
@@ -60,8 +68,8 @@ export default function CancelBooking() {
               Eliminar <span className="text-red-400">última cita</span>
             </h3>
             <p className="mt-2 text-sm text-gray-400">
-              Escribe tu número de WhatsApp y eliminaremos la <b>última</b> cita asociada
-              a ese número. Esta acción es permanente.
+              Escribe tu número de WhatsApp y eliminaremos la <b>última</b> cita de <b>hoy</b>{' '}
+              asociada a ese número. Esta acción es permanente.
             </p>
           </div>
 
@@ -78,15 +86,22 @@ export default function CancelBooking() {
                   inputMode="tel"
                   placeholder="+56912345678"
                   className="w-full rounded-xl border border-yellow-600/60 bg-[#131313] px-10 py-3 text-base text-white placeholder:text-gray-500 outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-500/30 transition"
-                  value={whatsapp}
+                  value={displayValue}
                   onChange={(e) => setWhatsapp(e.target.value)}
                 />
               </div>
+              <span className="mt-2 block text-xs text-gray-500">
+                Aceptamos formatos con o sin “+56”. Solo se elimina la última cita de <b>hoy</b>.
+              </span>
             </label>
+
+            <div aria-live="polite" className="sr-only">
+              {loading ? 'Enviando solicitud de cancelación…' : 'Listo para enviar'}
+            </div>
 
             <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
               <p className="text-xs text-gray-400">
-                * Solo aplica a la <b>última</b> cita creada con ese número.
+                * Solo aplica a la <b>última</b> cita creada con ese número <b>hoy</b>.
               </p>
 
               <button
