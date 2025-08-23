@@ -1,4 +1,6 @@
-﻿'use client'
+﻿
+//src/components/Gallery.tsx
+'use client'
 
 import { useState, useEffect } from 'react'
 import { motion } from "framer-motion";
@@ -30,14 +32,34 @@ export default function Services() {
   useEffect(() => {
     const fetchServices = async () => {
       try {
+        console.log('Fetching services...');
         const response = await fetch('/api/services');
+        
         if (!response.ok) {
-          throw new Error('Error al cargar los servicios');
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+        
         const data = await response.json();
-        setServices(data);
+        console.log('Services data received:', data, 'Type:', typeof data, 'Is array:', Array.isArray(data));
+        
+        // CORREGIDO: Verificar que data sea un array antes de asignarlo
+        if (Array.isArray(data)) {
+          setServices(data);
+        } else {
+          console.warn('API did not return an array:', data);
+          setServices([]);
+          // Si hay un mensaje de error en la respuesta, mostrarlo
+          if (data?.error) {
+            setError(`Error de API: ${data.error}`);
+          } else {
+            setError('La API no devolvió un formato válido');
+          }
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Un error desconocido ocurrió');
+        console.error('Error fetching services:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Un error desconocido ocurrió';
+        setError(`Error al cargar los servicios: ${errorMessage}`);
+        setServices([]); // Asegurar que services sea un array vacío
       } finally {
         setLoading(false);
       }
@@ -68,10 +90,20 @@ export default function Services() {
           Profesionalismo, precisión y estilo en cada corte.
         </p>
 
-        {loading && <p className="text-lg text-yellow-500">Cargando servicios...</p>}
-        {error && <p className="text-lg text-red-500">{error}</p>}
+        {loading && (
+          <div className="flex justify-center">
+            <div className="text-lg text-yellow-500">Cargando servicios...</div>
+          </div>
+        )}
+        
+        {error && (
+          <div className="text-center">
+            <p className="text-lg text-red-400 bg-red-900/20 p-4 rounded-lg">{error}</p>
+          </div>
+        )}
 
-        {!loading && !error && (
+        {/* CORREGIDO: Verificación adicional antes del map */}
+        {!loading && !error && Array.isArray(services) && services.length > 0 && (
           <motion.div
             className="grid gap-8 md:grid-cols-2 lg:grid-cols-3"
             initial="hidden"
@@ -103,6 +135,13 @@ export default function Services() {
               </motion.article>
             ))}
           </motion.div>
+        )}
+
+        {/* Mensaje si no hay servicios */}
+        {!loading && !error && (!services || services.length === 0) && (
+          <div className="text-center text-gray-400 py-8">
+            No hay servicios disponibles
+          </div>
         )}
       </div>
     </section>
