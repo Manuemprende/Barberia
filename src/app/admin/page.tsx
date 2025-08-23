@@ -132,13 +132,13 @@ export default function AdminDashboard() {
       setData(prev =>
         prev
           ? {
-              ...prev,
-              comments: {
-                ...prev.comments,
-                latest: prev.comments.latest.filter(c => c.id !== id),
-                visibleCount: Math.max(0, prev.comments.visibleCount - 1),
-              },
-            }
+            ...prev,
+            comments: {
+              ...prev.comments,
+              latest: prev.comments.latest.filter(c => c.id !== id),
+              visibleCount: Math.max(0, prev.comments.visibleCount - 1),
+            },
+          }
           : prev
       );
     } catch {
@@ -157,13 +157,13 @@ export default function AdminDashboard() {
       setData(prev =>
         prev
           ? {
-              ...prev,
-              comments: {
-                ...prev.comments,
-                latest: prev.comments.latest.filter(c => c.id !== id),
-                visibleCount: Math.max(0, prev.comments.visibleCount - 1),
-              },
-            }
+            ...prev,
+            comments: {
+              ...prev.comments,
+              latest: prev.comments.latest.filter(c => c.id !== id),
+              visibleCount: Math.max(0, prev.comments.visibleCount - 1),
+            },
+          }
           : prev
       );
     } catch {
@@ -183,8 +183,8 @@ export default function AdminDashboard() {
 
   const updateRowLocal =
     (arrSetter: (fn: (prev: Appointment[]) => Appointment[]) => void) =>
-    (id: number, patch: Partial<Appointment>) =>
-      arrSetter(prev => prev.map(x => (x.id === id ? { ...x, ...patch } : x)));
+      (id: number, patch: Partial<Appointment>) =>
+        arrSetter(prev => prev.map(x => (x.id === id ? { ...x, ...patch } : x)));
 
   const updateRowToday = updateRowLocal(setApts);
   const updateRowUpcoming = (id: number, patch: Partial<Appointment>) => {
@@ -376,11 +376,11 @@ export default function AdminDashboard() {
           {data.upcoming24h.length === 0 ? (
             <p className="text-gray-400 text-sm">No hay citas próximas.</p>
           ) : (
-            <ul className="grid gap-3 sm:grid-cols-2">
+            <ul className="grid gap-1 bg:grid-cols-2">
               {data.upcoming24h.map((a) => {
                 const phone = a.whatsapp?.replace(/\D+/g, '') || '';
                 return (
-                  <li key={a.id} className="rounded-lg border border-white/10 p-3 bg-[#0f0f0f] flex flex-col gap-2">
+                  <li key={a.id} className="rounded-lg border border-white/10 p-3 bg-[#0f0f0f] flex flex-col gap-2 overflow-hidden">
                     {/* Cabecera */}
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -421,10 +421,10 @@ export default function AdminDashboard() {
                             (a.status === 'CANCELLED'
                               ? 'bg-red-900/50 text-red-300 border border-red-700/50'
                               : a.status === 'COMPLETED'
-                              ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/40'
-                              : a.status === 'CONFIRMED'
-                              ? 'bg-blue-900/40 text-blue-300 border border-blue-700/40'
-                              : 'bg-yellow-900/40 text-yellow-200 border border-yellow-700/40')
+                                ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/40'
+                                : a.status === 'CONFIRMED'
+                                  ? 'bg-blue-900/40 text-blue-300 border border-blue-700/40'
+                                  : 'bg-yellow-900/40 text-yellow-200 border border-yellow-700/40')
                           }
                         >
                           {a.status}
@@ -435,8 +435,8 @@ export default function AdminDashboard() {
                             (a.paymentStatus === 'PAID'
                               ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/40'
                               : a.paymentStatus === 'REFUNDED'
-                              ? 'bg-purple-900/40 text-purple-300 border border-purple-700/40'
-                              : 'bg-gray-800 text-gray-300 border border-gray-700/50')
+                                ? 'bg-purple-900/40 text-purple-300 border border-purple-700/40'
+                                : 'bg-gray-800 text-gray-300 border border-gray-700/50')
                           }
                         >
                           {a.paymentStatus}
@@ -445,20 +445,21 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Botonera */}
-                    <div className="flex flex-wrap gap-2 mt-1">
+                    <div className="flex flex-wrap gap-3 mt-1">
                       {a.status !== 'CANCELLED' && a.status !== 'COMPLETED' && (
                         <button
                           onClick={() => toggleConfirm(a.id, a.status, 'upcoming')}
-                          className="px-3 py-1 rounded bg-blue-700 hover:bg-blue-600 text-white text-xs sm:text-sm"
+                          className="h-9 min-w-[108px] inline-flex items-center justify-center whitespace-nowrap px-4 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm"
                           title={a.status === 'CONFIRMED' ? 'Volver a Agendada' : 'Confirmar'}
                         >
                           {a.status === 'CONFIRMED' ? 'Desconfirmar' : 'Confirmar'}
                         </button>
+
                       )}
 
                       <button
                         onClick={() => toggleCancel(a.id, a.status, 'upcoming')}
-                        className="px-3 py-1 rounded bg-yellow-600 hover:bg-yellow-500 text-black text-xs sm:text-sm"
+                        className="h-9 min-w-[96px] whitespace-nowrap px-3 rounded bg-yellow-600 hover:bg-yellow-500 text-black text-xs sm:text-sm"
                         title={a.status === 'CANCELLED' ? 'Reactivar' : 'Anular'}
                       >
                         {a.status === 'CANCELLED' ? 'Reactivar' : 'Anular'}
@@ -467,7 +468,7 @@ export default function AdminDashboard() {
                       {a.paymentStatus !== 'PAID' && (
                         <button
                           onClick={() => markPaid(a.id, 'upcoming')}
-                          className="px-3 py-1 rounded bg-teal-700 hover:bg-teal-600 text-white text-xs sm:text-sm"
+                          className="h-9 min-w-[92px] whitespace-nowrap px-3 rounded bg-teal-600 hover:bg-teal-500 text-white text-xs sm:text-sm"
                         >
                           Pagado
                         </button>
@@ -475,9 +476,9 @@ export default function AdminDashboard() {
 
                       {phone && (
                         <a
-                          className="px-3 py-1 rounded border border-yellow-600 text-yellow-400 text-xs sm:text-sm"
+                          className="h-9 inline-flex items-center justify-center min-w-[98px] whitespace-nowrap px-3 rounded border border-green-600 text-green-400 text-xs sm:text-sm"
                           href={`https://wa.me/${phone}`}
-                          target="_blank"
+                          target="_green"
                           rel="noreferrer"
                         >
                           WhatsApp
@@ -529,18 +530,20 @@ export default function AdminDashboard() {
                     return (
                       <tr key={a.id} className="bg-[#131313] align-top">
                         {/* Cliente + botones debajo en móvil */}
-                        <td className="px-3 py-2 min-w-[260px]">
+                        <td className="px-3 py-2 w-full min-w-[350px]">
                           <div className="font-medium">{a.customerName}</div>
 
-                          <div className="mt-2 grid grid-cols-2 gap-2 sm:auto-cols-max sm:grid-flow-col sm:justify-start">
+                          <div className="mt-2 grid grid-cols-2 gap-3 sm:auto-cols-max sm:grid-flow-col sm:justify-start">
+
                             {a.status !== 'CANCELLED' && a.status !== 'COMPLETED' && (
                               <button
                                 onClick={() => toggleConfirm(a.id, a.status, 'today')}
-                                className="px-3 py-1 rounded bg-blue-700 hover:bg-blue-600 text-white text-xs sm:text-sm w-full sm:w-auto"
+                                className="h-9 min-w-[108px] inline-flex items-center justify-center whitespace-nowrap px-4 rounded bg-blue-700 hover:bg-blue-600 text-white text-xs sm:text-sm w-full bd:w-auto"
                                 title={a.status === 'CONFIRMED' ? 'Volver a Agendada' : 'Confirmar'}
                               >
                                 {a.status === 'CONFIRMED' ? 'Desconfirmar' : 'Confirmar'}
                               </button>
+
                             )}
 
                             <button
@@ -554,7 +557,7 @@ export default function AdminDashboard() {
                             {a.paymentStatus !== 'PAID' && (
                               <button
                                 onClick={() => markPaid(a.id, 'today')}
-                                className="px-3 py-1 rounded bg-teal-700 hover:bg-teal-600 text-white text-xs sm:text-sm w-full sm:w-auto"
+                                className="px-3 py-1 rounded bg-teal-600 hover:bg-teal-600 text-white text-xs sm:text-sm w-full sm:w-auto"
                               >
                                 Pagado
                               </button>
@@ -562,7 +565,7 @@ export default function AdminDashboard() {
 
                             {phone && (
                               <a
-                                className="px-3 py-1 rounded border border-yellow-600 text-yellow-400 text-xs sm:text-sm text-center w-full sm:w-auto"
+                                className="h-9 inline-flex items-center justify-center min-w-[98px] whitespace-nowrap px-3 rounded border border-green-400 text-green-400 text-xs sm:text-sm"
                                 href={`https://wa.me/${phone}`}
                                 target="_blank"
                                 rel="noreferrer"
@@ -595,10 +598,10 @@ export default function AdminDashboard() {
                               (a.status === 'CANCELLED'
                                 ? 'bg-red-900/50 text-red-300 border border-red-700/50'
                                 : a.status === 'COMPLETED'
-                                ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/40'
-                                : a.status === 'CONFIRMED'
-                                ? 'bg-blue-900/40 text-blue-300 border border-blue-700/40'
-                                : 'bg-yellow-900/40 text-yellow-200 border border-yellow-700/40')
+                                  ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/40'
+                                  : a.status === 'CONFIRMED'
+                                    ? 'bg-blue-900/40 text-blue-300 border border-blue-700/40'
+                                    : 'bg-yellow-900/40 text-yellow-200 border border-yellow-700/40')
                             }
                           >
                             {a.status}
@@ -612,8 +615,8 @@ export default function AdminDashboard() {
                               (a.paymentStatus === 'PAID'
                                 ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/40'
                                 : a.paymentStatus === 'REFUNDED'
-                                ? 'bg-purple-900/40 text-purple-300 border border-purple-700/40'
-                                : 'bg-gray-800 text-gray-300 border border-gray-700/50')
+                                  ? 'bg-purple-900/40 text-purple-300 border border-purple-700/40'
+                                  : 'bg-gray-800 text-gray-300 border border-gray-700/50')
                             }
                           >
                             {a.paymentStatus}
