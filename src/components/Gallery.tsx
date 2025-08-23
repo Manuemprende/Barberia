@@ -37,18 +37,36 @@ export default function Gallery() {
     setOpenIndex((i) => (i! + 1) % images.length);
   }, [openIndex, images.length]);
 
-  // --- NUEVO: función de carga reutilizable ---
+  // --- CORREGIDO: función de carga con mejor manejo de errores ---
   const fetchImages = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      
+      console.log('Fetching gallery images...');
       const res = await fetch('/api/gallery?visible=1', { cache: 'no-store' });
+      
+      // Verificar si la respuesta es exitosa
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      
       const data = await res.json();
-      if (Array.isArray(data)) setImages(data);
-      else setImages([]);
+      console.log('Gallery data received:', data, 'Type:', typeof data, 'Is array:', Array.isArray(data));
+      
+      // Verificación más robusta
+      if (Array.isArray(data)) {
+        setImages(data);
+      } else {
+        console.warn('API did not return an array:', data);
+        setImages([]);
+        if (data?.error) {
+          setError(`Error de API: ${data.error}`);
+        }
+      }
     } catch (err) {
       console.error('Error al cargar imágenes:', err);
-      setError('No se pudieron cargar las imágenes.');
+      setError(`No se pudieron cargar las imágenes: ${err instanceof Error ? err.message : 'Error desconocido'}`);
       setImages([]);
     } finally {
       setLoading(false);
@@ -136,11 +154,13 @@ export default function Gallery() {
         )}
 
         {error && !loading && (
-          <div className="text-center text-red-400">{error}</div>
+          <div className="text-center text-red-400 p-4 bg-red-900/20 rounded-lg">
+            {error}
+          </div>
         )}
 
-        {/* Masonry grid */}
-        {!loading && !error && (
+        {/* CORREGIDO: Verificación adicional antes del map */}
+        {!loading && !error && Array.isArray(images) && (
           <div className="columns-1 sm:columns-2 lg:columns-3 gap-4">
             {images.map((img, idx) => {
               // NUEVO: prioriza url/alt de la API; mantiene compatibilidad
@@ -174,10 +194,17 @@ export default function Gallery() {
             })}
           </div>
         )}
+
+        {/* Mostrar mensaje si no hay imágenes */}
+        {!loading && !error && (!images || images.length === 0) && (
+          <div className="text-center text-gray-400 py-8">
+            No hay imágenes para mostrar
+          </div>
+        )}
       </div>
 
-      {/* Lightbox */}
-      {isOpen && openIndex !== null && (
+      {/* Lightbox - CORREGIDO: Verificaciones adicionales */}
+      {isOpen && openIndex !== null && Array.isArray(images) && images[openIndex] && (
         <div
           className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={close}
