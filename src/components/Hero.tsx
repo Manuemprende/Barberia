@@ -4,13 +4,13 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 
 type Props = {
-  poster?: string;        // e.g. '/hero/poster.jpg'
+  poster?: string;        // e.g. '/hero/danny.png'
   mp4Src?: string;        // e.g. '/hero/barber.mp4'
   webmSrc?: string;       // e.g. '/hero/barber.webm'
 };
 
 export default function Hero({
-  poster = '/hero/poster.jpg',
+  poster = '/hero/danny.png',
   mp4Src = '/hero/barber.mp4',
   webmSrc = '/hero/barber.webm',
 }: Props) {
@@ -62,7 +62,7 @@ export default function Hero({
             <span className="text-white">una historia</span>
           </h1>
           <p className="mt-4 text-gray-200 max-w-2xl mx-auto">
-            Bienvenido a <span className="font-semibold text-yellow-400">Corte Maestro</span>,
+            Bienvenido a <span className="font-semibold text-yellow-400">Danny The Barber</span>,
             estilo con precisión. Agenda tu cita y transforma tu look.
           </p>
 

@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+
 const normalizePhone = (s: string) => s.replace(/\D+/g, '');
 
 export async function POST(req: Request) {
