@@ -19,14 +19,58 @@
   }
 }
 
+/* Fondo base global (por si una sección no trae su propio bg) */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #0a0a0a;
+  background-image: url('/bg/barbershop.jpg'); /* usa la imagen que prefieras */
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed; /* lindo efecto parallax */
 }
+
+/* Suaviza el contraste un poco; puedes quitarlo si no lo necesitas */
+.page-darken::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  pointer-events: none;
+  z-index: 0;
+}
+
 
 html {
   scroll-behavior: smooth;
 }
+
+/* ===== Fondos por sección (no toca componentes) ===== */
+.section {
+  position: relative;
+  isolation: isolate;       /* evita que el overlay afecte al contenido externo */
+}
+
+.section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: .45;             /* intensidad del fondo */
+}
+
+/* Oscurecer un poco para contraste */
+.section--overlay::before {
+  background-color: rgba(0,0,0,.35);
+  background-blend-mode: multiply;
+}
+
+/* Cambia aquí las imágenes por sección */
+.section--services::before      { background-image: url("/sections/img6.jpg"); }
+.section--booking::before       { background-image: url("/sections/img2.jpg"); }
+.section--gallery::before       { background-image: url("/sections/img3.jpg"); }
+.section--testimonials::before  { background-image: url("/sections/img4.jpg"); }
+.section--comments::before      { background-image: url("/sections/img5.jpg"); }
 
 

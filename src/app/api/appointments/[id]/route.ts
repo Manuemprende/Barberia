@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 export const runtime = 'nodejs';
 
-
 type Status = 'SCHEDULED' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
 type PaymentStatus = 'UNPAID' | 'PAID' | 'REFUNDED';
 
@@ -21,8 +20,8 @@ function isValidPayStatus(v: unknown): v is PaymentStatus {
 // Transiciones de status
 function canTransitionStatus(from: Status, to: Status): boolean {
   if (from === to) return true;
-  if (from === 'COMPLETED') return false;                         // COMPLETED es terminal
-  if (to === 'COMPLETED' && from === 'CANCELLED') return false;   // no completar canceladas
+  if (from === 'COMPLETED') return false;                 // COMPLETED es terminal
+  if (to === 'COMPLETED' && from === 'CANCELLED') return false; // no completar canceladas
   // Permitimos moverse entre SCHEDULED, CONFIRMED y CANCELLED
   return true;
 }
@@ -44,40 +43,34 @@ export async function PATCH(
       paidAt?: string | null;
     };
 
-    // Normalizar y validar enums
-    const body: {
-      status?: Status;
-      paymentStatus?: PaymentStatus;
-      paidAt?: string | null;
-    } = {};
-
+    // ---- normalización/validación ligera
+    let nextStatus: Status | undefined = undefined;
+    let nextPay: PaymentStatus | undefined = undefined;
     if (typeof raw.status !== 'undefined') {
       if (!isValidStatus(raw.status)) {
         return NextResponse.json({ error: 'status inválido' }, { status: 400 });
       }
-      body.status = raw.status;
+      nextStatus = raw.status;
     }
-
     if (typeof raw.paymentStatus !== 'undefined') {
       if (!isValidPayStatus(raw.paymentStatus)) {
         return NextResponse.json({ error: 'paymentStatus inválido' }, { status: 400 });
       }
-      body.paymentStatus = raw.paymentStatus;
+      nextPay = raw.paymentStatus;
     }
 
-    body.paidAt = raw.paidAt ?? undefined;
-
-    if (!body || (typeof body.status === 'undefined' && typeof body.paymentStatus === 'undefined')) {
+    if (typeof nextStatus === 'undefined' && typeof nextPay === 'undefined') {
       return NextResponse.json(
         { error: 'Nada para actualizar (status o paymentStatus requerido)' },
         { status: 400 }
       );
     }
 
-    // Estado actual
+    // ---- estado actual
     const current = await prisma.appointment.findUnique({
       where: { id: apptId },
       select: {
+        id: true,
         status: true,
         paymentStatus: true,
         paidAt: true,
@@ -85,60 +78,31 @@ export async function PATCH(
         serviceId: true,
       },
     });
-
     if (!current) {
       return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 });
     }
 
-    // --- Reglas de pago ---
-    if (typeof body.paymentStatus !== 'undefined') {
-      // Una vez PAID, no se puede volver atrás
-      if (current.paymentStatus === 'PAID' && body.paymentStatus !== 'PAID') {
+    // ---- reglas de transición de estado
+    if (typeof nextStatus !== 'undefined') {
+      if (!canTransitionStatus(current.status as Status, nextStatus)) {
         return NextResponse.json(
-          { error: 'La cita ya está pagada y no puede volver atrás.' },
-          { status: 400 }
-        );
-      }
-      // Solo permitimos marcar como PAID desde no pagado (no manejamos REFUND aquí)
-      if (current.paymentStatus !== 'PAID' && body.paymentStatus !== 'PAID') {
-        return NextResponse.json(
-          { error: 'Solo se permite marcar como pagada (no se admite revertir ni reembolsar por ahora).' },
+          { error: `Transición de estado no permitida: ${current.status} → ${nextStatus}` },
           { status: 400 }
         );
       }
     }
 
-    // --- Reglas de status ---
-    if (typeof body.status !== 'undefined') {
-      if (!canTransitionStatus(current.status as Status, body.status)) {
-        return NextResponse.json(
-          { error: `Transición de estado no permitida: ${current.status} → ${body.status}` },
-          { status: 400 }
-        );
-      }
-      // Si está pagada (ya) o quedará pagada tras este PATCH, no permitir volver a SCHEDULED
-      const willBePaid = body.paymentStatus === 'PAID' || current.paymentStatus === 'PAID';
-      if (willBePaid && body.status === 'SCHEDULED') {
-        return NextResponse.json(
-          { error: 'Una cita pagada no puede volver a SCHEDULED. Usa CONFIRMED o CANCELLED.' },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Armamos patch
+    // ---- armar patch
     const data: Record<string, any> = {};
+    if (typeof nextStatus !== 'undefined') data.status = nextStatus;
 
-    if (typeof body.status !== 'undefined') {
-      data.status = body.status;
-    }
+    // Si el frontend pide explícitamente un paymentStatus, lo aplicamos
+    if (typeof nextPay !== 'undefined') {
+      data.paymentStatus = nextPay;
 
-    // Al marcar PAID, setear paidAt y priceSnapshot si no está
-    if (typeof body.paymentStatus !== 'undefined') {
-      data.paymentStatus = body.paymentStatus;
-      if (body.paymentStatus === 'PAID') {
-        data.paidAt = body.paidAt ? new Date(body.paidAt) : new Date();
-        // Si no tenemos priceSnapshot, lo tomamos del servicio vigente
+      if (nextPay === 'PAID') {
+        data.paidAt = raw.paidAt ? new Date(raw.paidAt) : new Date();
+        // asegurar priceSnapshot
         if (!current.priceSnapshot || current.priceSnapshot <= 0) {
           if (current.serviceId) {
             const svc = await prisma.service.findUnique({
@@ -150,8 +114,32 @@ export async function PATCH(
             data.priceSnapshot = 0;
           }
         }
+      } else {
+        // UNPAID o REFUNDED -> no cuenta como pagado
+        data.paidAt = null;
       }
-      // Si algún día habilitas REFUNDED, decide si paidAt se conserva o se pone null.
+    }
+
+    // --- reglas automáticas cuando solo cambian STATUS ---
+    const willBeStatus = typeof nextStatus !== 'undefined' ? nextStatus : (current.status as Status);
+    const willBePay = typeof nextPay !== 'undefined' ? nextPay : (current.paymentStatus as PaymentStatus);
+
+    // 1) Si pasamos a CANCELLED y estaba PAID (o terminará PAID en este patch) -> REFUNDED
+    if (willBeStatus === 'CANCELLED' && (current.paymentStatus === 'PAID' || willBePay === 'PAID')) {
+      data.paymentStatus = 'REFUNDED';
+      data.paidAt = null;
+    }
+
+    // 2) Si reactivamos una cancelada que estaba REFUNDED y no se envió paymentStatus explícito -> UNPAID
+    if (
+      current.status === 'CANCELLED' &&
+      typeof nextStatus !== 'undefined' &&
+      nextStatus !== 'CANCELLED' &&
+      typeof nextPay === 'undefined' &&
+      current.paymentStatus === 'REFUNDED'
+    ) {
+      data.paymentStatus = 'UNPAID';
+      data.paidAt = null;
     }
 
     const updated = await prisma.appointment.update({

@@ -1,3 +1,5 @@
+//src/app/admin/page.tsx
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -40,6 +42,7 @@ type GalleryImage = {
   order?: number | null;
   createdAt: string;
 };
+
 
 const clp = (n: number) =>
   n.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
@@ -202,12 +205,36 @@ export default function AdminDashboard() {
     (where === 'today' ? updateRowToday : updateRowUpcoming)(id, { status: next });
   };
 
-  const toggleCancel = async (id: number, current: Appointment['status'], where: 'today' | 'upcoming') => {
+  const toggleCancel = async (
+    id: number,
+    current: Appointment['status'],
+    where: 'today' | 'upcoming'
+  ) => {
     const next = current === 'CANCELLED' ? 'SCHEDULED' : 'CANCELLED';
+
+    // 🧠 Detectamos el paymentStatus actual desde el array correspondiente
+    const currentAppt =
+      where === 'today'
+        ? apts.find(a => a.id === id)
+        : data?.upcoming24h.find(a => a.id === id);
+
     const r = await patchAppt(id, { status: next });
     if (!r.ok) return;
-    (where === 'today' ? updateRowToday : updateRowUpcoming)(id, { status: next });
+
+    // Parche local: si pasamos a CANCELLED y estaba PAID, mostrar REFUNDED en la UI
+    const patch: Partial<Appointment> = { status: next };
+    if (next === 'CANCELLED' && currentAppt?.paymentStatus === 'PAID') {
+      patch.paymentStatus = 'REFUNDED';
+    }
+    // Si reactivamos una cancelada que estaba REFUNDED, vuelve a UNPAID
+    if ((current === 'CANCELLED') && currentAppt?.paymentStatus === 'REFUNDED') {
+      patch.paymentStatus = 'UNPAID';
+    }
+
+    (where === 'today' ? updateRowToday : updateRowUpcoming)(id, patch);
   };
+
+  
 
   const markPaid = async (id: number, where: 'today' | 'upcoming') => {
     const r = await patchAppt(id, { paymentStatus: 'PAID' });
@@ -853,4 +880,8 @@ function Card({ k, v }: { k: string; v: string | number }) {
       <p className="text-3xl font-bold">{v}</p>
     </div>
   );
+
+
 }
+
+

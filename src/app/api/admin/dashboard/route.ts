@@ -1,4 +1,4 @@
-//src/app/api/admin/dashboard/route.ts
+// src/app/api/admin/dashboard/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 export const runtime = 'nodejs';
@@ -82,8 +82,22 @@ export async function GET() {
       barbersTotal,
     ] = await Promise.all([
       prisma.appointment.count({ where: { start: { gte: todayStart, lte: todayEnd } } }),
-      prisma.appointment.count({ where: { start: { gte: todayStart, lte: todayEnd }, paymentStatus: 'PAID' } }),
-      prisma.appointment.count({ where: { start: { gte: todayStart, lte: todayEnd }, paymentStatus: 'UNPAID' } }),
+      prisma.appointment.count({
+        where: {
+          start: { gte: todayStart, lte: todayEnd },
+          paymentStatus: 'PAID',
+          // ✅ NUEVO: ignorar canceladas antiguas que quedaron con PAID
+          status: { not: 'CANCELLED' },
+        },
+      }),
+      prisma.appointment.count({
+        where: {
+          start: { gte: todayStart, lte: todayEnd },
+          paymentStatus: 'UNPAID',
+          // ✅ NUEVO: no contar canceladas en "unpaid" del día
+          status: { not: 'CANCELLED' },
+        },
+      }),
 
       prisma.appointment.findMany({
         where: { start: { gte: now, lte: next24 }, status: { not: 'CANCELLED' } },
@@ -104,15 +118,30 @@ export async function GET() {
 
       prisma.appointment.aggregate({
         _sum: { priceSnapshot: true },
-        where: { paymentStatus: 'PAID', paidAt: { gte: todayStart, lte: todayEnd } },
+        where: {
+          paymentStatus: 'PAID',
+          paidAt: { gte: todayStart, lte: todayEnd },
+          // ✅ NUEVO: blindaje extra por si existen datos antiguos PAID + CANCELLED
+          status: { not: 'CANCELLED' },
+        },
       }),
       prisma.appointment.aggregate({
         _sum: { priceSnapshot: true },
-        where: { paymentStatus: 'PAID', paidAt: { gte: weekStart, lte: weekEnd } },
+        where: {
+          paymentStatus: 'PAID',
+          paidAt: { gte: weekStart, lte: weekEnd },
+          // ✅ NUEVO
+          status: { not: 'CANCELLED' },
+        },
       }),
       prisma.appointment.aggregate({
         _sum: { priceSnapshot: true },
-        where: { paymentStatus: 'PAID', paidAt: { gte: monthStart, lte: monthEnd } },
+        where: {
+          paymentStatus: 'PAID',
+          paidAt: { gte: monthStart, lte: monthEnd },
+          // ✅ NUEVO
+          status: { not: 'CANCELLED' },
+        },
       }),
 
       prisma.appointment.count({ where: { paymentStatus: 'UNPAID'   } }),

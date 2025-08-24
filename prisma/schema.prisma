@@ -26,12 +26,14 @@ model Barber {
   appointments Appointment[]
 }
 
+// schema.prisma
 model Service {
-  id           Int           @id @default(autoincrement())
-  name         String
-  price        Int
-  duration     Int
-  appointments Appointment[]
+  id          Int           @id @default(autoincrement())
+  name        String        @unique
+  price       Int
+  duration    Int
+  iconKey     String? // p.ej. 'Scissors', 'Crown', etc.
+  Appointment Appointment[]
 }
 
 model Comment {
@@ -45,30 +47,32 @@ model Comment {
 }
 
 model Appointment {
-  id                  Int               @id @default(autoincrement())
-  customerName        String
-  whatsapp            String
-  whatsappNormalized  String            @default("")
-  barber              Barber            @relation(fields: [barberId], references: [id])
-  barberId            Int
-  service             Service           @relation(fields: [serviceId], references: [id])
-  serviceId           Int
-  start               DateTime
-  end                 DateTime
-  appointmentDate     DateTime          @default(now()) @db.Date
-  status              AppointmentStatus @default(SCHEDULED)
-  notes               String?
-  createdAt           DateTime          @default(now())
-  paymentStatus       PaymentStatus     @default(UNPAID)
-  paidAt              DateTime?
-  priceSnapshot       Int               @default(0)
+  id                 Int               @id @default(autoincrement())
+  customerName       String
+  whatsapp           String
+  whatsappNormalized String            @default("")
+  barber             Barber            @relation(fields: [barberId], references: [id])
+  barberId           Int
+  service            Service           @relation(fields: [serviceId], references: [id])
+  serviceId          Int
+  start              DateTime
+  end                DateTime
+  appointmentDate    DateTime          @default(now()) @db.Date
+  status             AppointmentStatus @default(SCHEDULED)
+  notes              String?
+  createdAt          DateTime          @default(now())
+  paymentStatus      PaymentStatus     @default(UNPAID)
+  paidAt             DateTime?
+  priceSnapshot      Int               @default(0)
 
   @@index([barberId, start, end])
   @@index([serviceId])
   @@index([whatsappNormalized, appointmentDate])
 }
 
-/* 👇 ÚNICA definición de GalleryImage */
+/**
+ * 👇 ÚNICA definición de GalleryImage
+ */
 model GalleryImage {
   id        Int      @id @default(autoincrement())
   url       String
@@ -76,5 +80,6 @@ model GalleryImage {
   visible   Boolean  @default(true)
   order     Int?
   createdAt DateTime @default(now())
+
   @@map("gallery_images")
 }
